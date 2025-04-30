@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SendHorizonal, Users, Paperclip, Image as ImageIcon, Bot, Smile, Loader2, MessageSquare } from 'lucide-react'; // Added Loader2 and MessageSquare
+import { SendHorizonal, Users, Paperclip, ImageIcon, Bot, Smile, Loader2, MessageSquare } from 'lucide-react'; // Added Loader2 and MessageSquare
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -176,8 +176,8 @@ export function Chat() {
         <ScrollArea className="h-full" ref={scrollAreaRef}>
           {/* Viewport needs a direct ref */}
           <div className="h-full" ref={viewportRef}>
-             {/* Inner container for padding and messages */}
-              <div className="p-4 space-y-4 pb-6"> {/* Add padding-bottom */}
+             {/* Inner container for padding and messages - Increased pb-10 */}
+              <div className="p-4 space-y-4 pb-10"> {/* Increased padding-bottom */}
                 {isLoading ? (
                     // Loading Skeletons
                     <>
@@ -187,7 +187,12 @@ export function Chat() {
                                <div className={cn("flex flex-col gap-1.5", i % 2 === 0 ? 'items-start' : 'items-end')}>
                                    <Skeleton className={cn("h-4 w-20", i % 2 !== 0 && 'hidden')} /> {/* Sender name */}
                                    <Skeleton className={cn("h-10 rounded-lg", i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-32' : 'w-40')} />
-                                   <Skeleton className="h-3 w-10 inline-block" /> {/* Timestamp - use inline-block for proper skeleton display */}
+                                   <span className={cn(
+                                       "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for skeleton
+                                        'opacity-0' // Hide timestamp skeleton initially
+                                   )}>
+                                     <Skeleton className="h-3 w-10 inline-block" /> {/* Timestamp - use inline-block for proper skeleton display */}
+                                   </span>
                                </div>
                                {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
                            </div>
@@ -251,10 +256,11 @@ export function Chat() {
 
                                 {/* Timestamp (conditionally displayed, aligned right within bubble) */}
                                 <span className={cn(
-                                    "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for skeleton
+                                    "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for layout stability
                                     showTimestamp ? 'opacity-60' : 'opacity-0' // Hide if not last message of group
                                 )}>
-                                   {isClient ? format(new Date(msg.timestamp), 'p') : <Skeleton className="h-3 w-10 inline-block" />} {/* Show skeleton on server, use inline-block */}
+                                   {/* Render only on client to avoid hydration issues */}
+                                   {isClient ? format(new Date(msg.timestamp), 'p') : ''}
                                 </span>
                             </div>
 
@@ -340,3 +346,4 @@ export function Chat() {
     </div>
   );
 }
+
