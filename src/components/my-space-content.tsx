@@ -1,9 +1,11 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Folder, Star, Users, Clock } from "lucide-react";
 import Image from 'next/image'; // Import next/image
+import { cn } from "@/lib/utils"; // Import cn utility function
 
 export function MySpaceContent() {
   // Placeholder data - replace with actual user data fetching
