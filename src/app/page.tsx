@@ -67,8 +67,8 @@ export default function Home() {
   // Render main app layout if authenticated
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10"> {/* Use h-screen for full height */}
-       {/* Main Content Area - Adjusted pb-14 to match the height of BottomNavigation (h-14) */}
-       <main className="flex-1 p-2 md:p-4 pb-14"> {/* Adjusted padding-bottom */}
+       {/* Main Content Area - Adjusted pb-14 to match the height of BottomNavigation (h-14). Added overflow-hidden */}
+       <main className="flex-1 p-2 md:p-4 pb-14 overflow-hidden"> {/* Add overflow-hidden to main */}
          <Card className="h-full w-full shadow-xl border-primary/10 overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-0">
              {/* Chat Area - Takes full height within Card */}
              <div className="lg:col-span-2 h-full overflow-hidden border-r border-border/50">

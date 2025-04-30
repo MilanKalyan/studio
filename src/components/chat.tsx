@@ -176,8 +176,8 @@ export function Chat() {
         <ScrollArea className="h-full" ref={scrollAreaRef}>
           {/* Viewport needs a direct ref */}
           <div className="h-full" ref={viewportRef}>
-             {/* Inner container for padding and messages - Increased pb-10 */}
-              <div className="p-4 space-y-4 pb-10"> {/* Increased padding-bottom */}
+             {/* Inner container for padding and messages - Removed pb-10 */}
+              <div className="p-4 space-y-4"> {/* Removed pb-10 */}
                 {isLoading ? (
                     // Loading Skeletons
                     <>
