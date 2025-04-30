@@ -62,7 +62,7 @@ const MENU_ITEM_SIZE = 48; // Approx size of menu items (w-12 h-12 = 48px)
 const MENU_GAP = 12; // Gap between menu items (gap-3)
 
 
-export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right' }: BottomNavigationProps) {
+export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }: BottomNavigationProps) { // Changed default to 'top-right'
   const router = useRouter();
   const pathname = usePathname();
   const [openSheet, setOpenSheet] = useState<string | null>(null);
@@ -125,6 +125,7 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
   }, [initialSnapPosition]); // Add initialSnapPosition dependency
 
   const resetFabPositionToSnap = (snapPos: NavSnapPosition) => {
+      if (typeof window === 'undefined') return; // Guard against SSR
       const { innerWidth, innerHeight } = window;
       let newPos = { top: 0, left: 0 };
       const padding = 16; // 1rem = 16px
@@ -242,9 +243,10 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
     // Determine the closest corner and snap
     snapToCorner();
 
-  }, [isDragging, handleDragging]); // Added handleDragging dependency
+  }, [isDragging, handleDragging, snapPosition]); // Added snapPosition dependency
 
-  const snapToCorner = () => {
+  const snapToCorner = useCallback(() => {
+      if (typeof window === 'undefined') return; // Guard against SSR
       const { innerWidth, innerHeight } = window;
       const centerX = innerWidth / 2;
       const centerY = innerHeight / 2;
@@ -262,7 +264,7 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
       }
 
       setSnapPosition(newSnapPosition); // This will trigger the useEffect to reset position and save
-  };
+  }, [fabPosition]); // Added fabPosition dependency
 
 
   // --- Navigation Logic ---
@@ -296,19 +298,21 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
 
 
   // Calculate menu position based on FAB position and snap corner
-  const getMenuPositionStyle = () => {
+  const getMenuPositionStyle = useCallback((): React.CSSProperties => {
       const style: React.CSSProperties = {
           position: 'fixed',
           display: 'flex',
           flexDirection: 'column',
           gap: `${MENU_GAP}px`,
           transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
-          zIndex: 50,
+          zIndex: 50, // Below FAB (60)
       };
 
       if (!isNavOpen) {
           style.opacity = 0;
-          style.transform = 'scale(0.95) translateY(10px)';
+          style.transform = snapPosition.includes('bottom')
+              ? 'scale(0.95) translateY(10px)'
+              : 'scale(0.95) translateY(-10px)';
           style.pointerEvents = 'none';
       } else {
           style.opacity = 1;
@@ -316,8 +320,6 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
           style.pointerEvents = 'auto';
       }
 
-      const fabCenterY = fabPosition.top + FAB_SIZE / 2;
-      const fabCenterX = fabPosition.left + FAB_SIZE / 2;
       const menuHeight = navItems.length * MENU_ITEM_SIZE + (navItems.length -1) * MENU_GAP;
 
       switch (snapPosition) {
@@ -348,17 +350,15 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
               break;
       }
 
-        if (!isNavOpen) {
-            style.transform = snapPosition.includes('bottom')
-                ? 'scale(0.95) translateY(10px)'
-                : 'scale(0.95) translateY(-10px)'; // Adjust animation direction
-        } else {
-             style.transform = 'scale(1) translateY(0)';
-        }
-
-
       return style;
-  };
+  }, [isNavOpen, snapPosition, fabPosition, navItems.length]); // Added dependencies
+
+
+  // Ensure component only renders on client after mount to avoid hydration errors
+  if (!hasMounted) {
+      return null; // Or a placeholder skeleton if preferred
+  }
+
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -368,8 +368,6 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
             className={cn(
                 "fixed z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms] rounded-full cursor-grab transition-all duration-300 ease-out", // Added transition for snap back
                 isDragging && "scale-110 shadow-2xl", // Scale up and shadow during drag
-                 // Hide until mounted and position is calculated
-                !hasMounted && "opacity-0"
             )}
             style={{
                 top: `${fabPosition.top}px`,
@@ -480,5 +478,3 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right
     </TooltipProvider>
   );
 }
-
-    
