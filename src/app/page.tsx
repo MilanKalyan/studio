@@ -3,12 +3,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Chat } from '@/components/chat';
-import { GameLobby } from '@/components/game-lobby'; // Import GameLobby
 import LoginPage from './auth/login/page'; // Import the Login page
 import Loading from './loading'; // Import the Loading component
 import { BottomNavigation } from '@/components/bottom-navigation'; // Import BottomNavigation
-import { Card } from '@/components/ui/card'; // Import Card
+import { AppLayout } from '@/components/app-layout'; // Import the main App Layout
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null initially, then boolean
@@ -68,25 +66,15 @@ export default function Home() {
   return (
     // Use h-screen and flex-col for full height layout that includes the bottom nav
     <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10">
-       {/* Main Content Area - flex-1 allows it to grow, pb-16 provides space for the nav */}
+       {/* Main Content Area - flex-1 allows it to grow. REMOVED pb-16 */}
        {/* overflow-hidden ensures content doesn't spill out */}
-       <main className="flex-1 p-2 md:p-4 pb-16 overflow-hidden">
-         {/* Card takes full height within the main area */}
-         <Card className="h-full w-full shadow-xl border-primary/10 overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-0">
-             {/* Chat Area - Takes full height within Card */}
-             <div className="lg:col-span-2 h-full overflow-hidden border-r border-border/50">
-               <Chat />
-             </div>
-             {/* Game Lobby Area - Takes full height within Card */}
-             <div className="hidden lg:flex lg:col-span-1 h-full overflow-hidden"> {/* Hide on smaller screens */}
-               <GameLobby />
-             </div>
-         </Card>
+       <main className="flex-1 p-2 md:p-4 overflow-hidden">
+         {/* AppLayout handles the main structure */}
+         <AppLayout />
        </main>
 
-       {/* Bottom Navigation - Fixed at the bottom */}
+       {/* Bottom Navigation - Now a floating component */}
        <BottomNavigation onLogout={handleLogout} />
     </div>
   );
 }
-

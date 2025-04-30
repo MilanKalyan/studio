@@ -1,11 +1,12 @@
 
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Compass } from "lucide-react";
 
 export default function BrowsePage() {
   return (
-    // Adjust padding-bottom to match new nav height (h-14 = 3.5rem -> pb-16 (4rem))
-    <div className="flex flex-col h-full p-4 md:p-8 pb-16">
+    // Removed padding-bottom as nav is floating
+    <div className="flex flex-col h-full p-4 md:p-8">
       <Card className="flex-1">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl">
