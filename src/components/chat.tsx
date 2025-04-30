@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -36,19 +37,24 @@ export function Chat() {
   const [newMessage, setNewMessage] = useState('');
   const [isClient, setIsClient] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const currentUser = 'Bob';
+  const currentUser = 'Bob'; // Simulate the current user
 
+  // --- Client-Side Mounting ---
   useEffect(() => {
     setIsClient(true);
     // Scroll to bottom initially, but wait for potential layout shifts
-    setTimeout(() => scrollToBottom('auto'), 100);
+    // Use 'instant' for the initial scroll to avoid jarring animation on load
+    setTimeout(() => scrollToBottom('instant'), 100);
   }, []);
 
+  // --- Scroll to Bottom Logic ---
    // Ensure scroll to bottom happens after messages are rendered/updated
   useEffect(() => {
     if (isClient) {
-       setTimeout(() => scrollToBottom('smooth'), 100); // Add slight delay
+       // Scroll smoothly after new messages are added
+       setTimeout(() => scrollToBottom('smooth'), 100);
     }
+    // Only re-run when messages change *after* the initial mount
   }, [messages, isClient]);
 
 
@@ -61,33 +67,37 @@ export function Chat() {
     }
   };
 
+  // --- Message Sending Logic ---
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim()) {
       const message: Message = {
         id: String(Date.now()),
-        sender: currentUser,
+        sender: currentUser, // Use the simulated current user
         text: newMessage,
         timestamp: Date.now(),
-        avatar: 'https://picsum.photos/seed/bob/40/40',
+        avatar: 'https://picsum.photos/seed/bob/40/40', // Current user's avatar
       };
       setMessages(prevMessages => [...prevMessages, message]);
       setNewMessage('');
+      // No need to manually scroll here, useEffect handles it
     }
   };
 
+  // --- Rendering ---
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Chat Header (Optional, can be part of a potential top bar later) */}
+      {/* Chat Header */}
        <CardHeader className="flex flex-row items-center justify-between border-b border-border p-4 sticky top-0 bg-background z-10">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-6 w-6 text-secondary" />
           <CardTitle className="text-lg font-semibold">Global Chat</CardTitle>
         </div>
+         {/* Show Skeleton only on server, actual button on client */}
          {isClient ? (
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="View Users">
                 <Users className="h-5 w-5" />
-                <span className="sr-only">View Users</span>
+                {/* <span className="sr-only">View Users</span> */}
             </Button>
          ) : (
             <Skeleton className="h-10 w-10 rounded-md" />
@@ -97,7 +107,7 @@ export function Chat() {
       {/* Chat Messages Area */}
       <CardContent className="flex-1 p-0 overflow-hidden">
         <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
-          <div className="space-y-4 mb-4"> {/* Add margin-bottom to prevent overlap with input */}
+          <div className="space-y-4 mb-4"> {/* Add margin-bottom */}
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -105,12 +115,15 @@ export function Chat() {
                   msg.sender === currentUser ? 'justify-end' : 'justify-start'
                 }`}
               >
+                {/* Sender Avatar (only if not current user) */}
                 {msg.sender !== currentUser && (
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src={msg.avatar} alt={msg.sender} />
                     <AvatarFallback>{msg.sender.charAt(0)}</AvatarFallback>
                   </Avatar>
                 )}
+
+                {/* Message Bubble */}
                 <div
                   className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-md transition-transform duration-300 ease-out ${
                     msg.sender === currentUser
@@ -118,12 +131,19 @@ export function Chat() {
                       : 'bg-secondary text-secondary-foreground animate-in slide-in-from-left-5'
                   }`}
                 >
+                  {/* Sender Name (only if not current user) */}
                   {msg.sender !== currentUser && <p className="font-semibold text-xs mb-1 opacity-80">{msg.sender}</p>}
+                  {/* Message Text */}
                   <p>{msg.text}</p>
-                  <p className="text-xs opacity-60 mt-1 text-right min-h-[1em]">
+                  {/* Timestamp */}
+                  {/* Use span instead of p to allow div (Skeleton) inside */}
+                  <span className="text-xs opacity-60 mt-1 text-right min-h-[1em] block">
+                    {/* Conditionally render timestamp or skeleton */}
                     {isClient ? format(new Date(msg.timestamp), 'p') : <Skeleton className="h-3 w-10 inline-block"/>}
-                  </p>
+                  </span>
                 </div>
+
+                 {/* Current User Avatar (only if is current user) */}
                  {msg.sender === currentUser && (
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src={msg.avatar} alt={msg.sender} />
@@ -137,43 +157,44 @@ export function Chat() {
       </CardContent>
 
       {/* Chat Input Bar */}
-      <div className="p-4 border-t border-border bg-background sticky bottom-16 z-10"> {/* Adjust bottom-16 based on BottomNav height */}
+      <div className="p-4 border-t border-border bg-background sticky bottom-16 z-10"> {/* Adjust bottom offset */}
+         {/* Render Skeleton on server, actual input bar on client */}
          {isClient ? (
            <TooltipProvider delayDuration={200}>
              <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
                 {/* Action Buttons */}
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button">
+                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file">
                             <Paperclip className="h-5 w-5" />
-                            <span className="sr-only">Attach file</span>
+                            {/* <span className="sr-only">Attach file</span> */}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Attach file</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button">
+                        <Button variant="ghost" size="icon" type="button" aria-label="Attach image">
                             <ImageIcon className="h-5 w-5" />
-                            <span className="sr-only">Attach image</span>
+                           {/* <span className="sr-only">Attach image</span> */}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Attach image</TooltipContent>
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button">
+                        <Button variant="ghost" size="icon" type="button" aria-label="AI Chat Bot">
                             <Bot className="h-5 w-5" />
-                            <span className="sr-only">AI Chat Bot</span>
+                            {/* <span className="sr-only">AI Chat Bot</span> */}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>AI Chat Bot</TooltipContent>
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                         <Button variant="ghost" size="icon" type="button">
+                         <Button variant="ghost" size="icon" type="button" aria-label="Stickers and Emoji">
                             <Smile className="h-5 w-5" />
-                            <span className="sr-only">Stickers</span>
+                           {/* <span className="sr-only">Stickers</span> */}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Stickers & Emoji</TooltipContent>
@@ -192,9 +213,9 @@ export function Chat() {
                 {/* Send Button */}
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button type="submit" size="icon" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full retro-glow">
+                        <Button type="submit" size="icon" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full retro-glow" aria-label="Send message">
                             <SendHorizonal className="h-5 w-5" />
-                            <span className="sr-only">Send message</span>
+                           {/* <span className="sr-only">Send message</span> */}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Send message</TooltipContent>
@@ -202,6 +223,7 @@ export function Chat() {
             </form>
           </TooltipProvider>
          ) : (
+            // Skeleton Loader for Input Bar
             <div className="flex w-full items-center space-x-2">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <Skeleton className="h-10 w-10 rounded-full" />
