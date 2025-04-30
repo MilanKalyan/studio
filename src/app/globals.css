@@ -13,17 +13,17 @@
     --card-foreground: 271 100% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 271 100% 10%;
-    --primary: 271 100% 25%; /* Deep Purple */
-    --primary-foreground: 240 60% 95%; /* Light Lavender */
-    --secondary: 181 100% 74%; /* Electric Blue */
+    --primary: 271 100% 30%; /* Slightly darker Deep Purple */
+    --primary-foreground: 240 60% 98%; /* Near White Lavender */
+    --secondary: 181 100% 65%; /* Slightly desaturated Electric Blue */
     --secondary-foreground: 271 100% 10%; /* Dark Purple */
     --muted: 240 60% 95%; /* Light Lavender */
-    --muted-foreground: 271 50% 35%; /* Muted Purple */
+    --muted-foreground: 271 50% 40%; /* Slightly darker Muted Purple */
     --accent: 240 67% 97%; /* Lavender */
     --accent-foreground: 271 100% 25%; /* Deep Purple */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 271 70% 80%; /* Lighter Purple Border */
+    --border: 271 70% 85%; /* Slightly lighter Purple Border */
     --input: 271 70% 80%;
     --ring: 181 100% 74%; /* Electric Blue */
     --chart-1: 12 76% 61%;
@@ -31,94 +31,108 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --radius: 0.75rem; /* Slightly larger radius */
   }
 
   .dark {
-    --background: 271 100% 10%; /* Dark Purple */
-    --foreground: 240 60% 95%; /* Light Lavender */
-    --card: 271 80% 15%; /* Slightly Lighter Dark Purple */
-    --card-foreground: 240 60% 95%; /* Light Lavender */
-    --popover: 271 80% 12%; /* Darker Popover */
-    --popover-foreground: 240 60% 95%; /* Light Lavender */
-    --primary: 271 100% 35%; /* Brighter Deep Purple */
-    --primary-foreground: 240 60% 98%; /* Near White Lavender */
+    --background: 271 100% 8%; /* Slightly darker Dark Purple */
+    --foreground: 240 60% 96%; /* Slightly adjusted Light Lavender */
+    --card: 271 80% 14%; /* Adjusted Card Background */
+    --card-foreground: 240 60% 96%; /* Light Lavender */
+    --popover: 271 80% 10%; /* Darker Popover */
+    --popover-foreground: 240 60% 96%; /* Light Lavender */
+    --primary: 271 100% 55%; /* Brighter Primary for contrast */
+    --primary-foreground: 240 60% 99%; /* Near White */
     --secondary: 181 100% 74%; /* Electric Blue */
     --secondary-foreground: 271 100% 10%; /* Dark Purple */
-    --muted: 271 50% 25%; /* Muted Dark Purple */
-    --muted-foreground: 240 50% 80%; /* Muted Light Lavender */
-    --accent: 240 67% 97%; /* Lavender */
-    --accent-foreground: 271 100% 15%; /* Dark Purple for Accent Text */
-    --destructive: 0 70% 50%; /* Adjusted Destructive */
+    --muted: 271 50% 20%; /* Slightly lighter Muted Dark Purple */
+    --muted-foreground: 240 50% 75%; /* Adjusted Muted Light Lavender */
+    --accent: 271 60% 30%; /* Darker Accent */
+    --accent-foreground: 240 60% 98%; /* Near White Lavender for Accent Text */
+    --destructive: 0 70% 55%; /* Adjusted Destructive */
     --destructive-foreground: 0 0% 98%;
-    --border: 271 70% 20%; /* Purple Border */
-    --input: 271 70% 20%; /* Purple Input */
+    --border: 271 70% 25%; /* Slightly brighter Purple Border */
+    --input: 271 70% 22%; /* Slightly lighter Purple Input */
     --ring: 240 67% 97%; /* Lavender Ring */
     --chart-1: 181 100% 74%; /* Electric Blue */
     --chart-2: 271 100% 60%; /* Lighter Purple */
     --chart-3: 240 67% 97%; /* Lavender */
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem; /* Keep radius consistent */
+    --radius: 0.75rem; /* Consistent larger radius */
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    /* Subtle transition for color changes */
+    @apply transition-colors duration-150 ease-in-out;
   }
   body {
     @apply bg-background text-foreground;
     /* Apply dark theme by default */
     @apply dark;
     /* Improve scrollbar behavior */
-    scrollbar-gutter: stable;
+    scrollbar-gutter: stable both-edges; /* More stable gutter */
   }
 }
 
 /* Add simple retro animation */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 3px hsl(var(--secondary)), 0 0 6px hsl(var(--secondary) / 0.7);
+    box-shadow: 0 0 4px hsl(var(--secondary) / 0.8), 0 0 8px hsl(var(--secondary) / 0.5);
+    /* Add subtle text shadow */
+    text-shadow: 0 0 2px hsl(var(--secondary-foreground) / 0.1);
   }
   50% {
-    box-shadow: 0 0 6px hsl(var(--secondary)), 0 0 12px hsl(var(--secondary) / 0.7);
+    box-shadow: 0 0 8px hsl(var(--secondary) / 0.8), 0 0 16px hsl(var(--secondary) / 0.5);
+     /* Add subtle text shadow */
+    text-shadow: 0 0 4px hsl(var(--secondary-foreground) / 0.1);
   }
 }
 
 .retro-glow {
-  animation: pulse-glow 3s infinite ease-in-out;
+  animation: pulse-glow 3.5s infinite ease-in-out;
 }
 
 /* Style scrollbars for a more integrated look */
 ::-webkit-scrollbar {
-  width: 6px; /* Slightly thinner */
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted) / 0.2); /* More subtle track */
+  background: hsl(var(--background) / 0.1); /* Match background */
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.5); /* More subtle thumb */
+  background: hsl(var(--primary) / 0.4); /* More subtle thumb */
   border-radius: 10px;
-  border: 1px solid hsl(var(--background) / 0.5); /* Add slight border */
+  border: 2px solid transparent; /* Make border transparent */
+  background-clip: content-box; /* Clip background to content box */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.8);
+  background: hsl(var(--primary) / 0.6);
 }
 
 /* Add fade-in animation with customizable delay */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px) scale(0.98); } /* Add subtle scale */
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .animate-fade-in {
-  animation: fade-in 0.4s ease-out forwards;
+  animation: fade-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; /* Smoother ease */
   /* Default delay if not overridden */
   animation-delay: var(--fade-in-delay, 0ms);
+}
+
+/* General interactive element hover effect */
+@layer components {
+  .interactive-hover {
+     @apply transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.98];
+  }
 }

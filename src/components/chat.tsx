@@ -53,7 +53,9 @@ export interface Player { // Exporting for use in MySpaceContent
 }
 
 // Placeholder friends data (consistent with MySpaceContent)
+// Added current user 'bob' to friends list for demo purposes
 const placeholderFriends: Player[] = [
+     { id: 'bob', name: 'Bob', avatar: 'https://picsum.photos/seed/bob/40/40', status: 'online', kinectId: 'KINECT#BOBSID'}, // Current User
      { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online', kinectId: 'KINECT#1234'},
      { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline', kinectId: 'KINECT#5678'},
      { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame', kinectId: 'KINECT#9012'},
@@ -78,8 +80,8 @@ interface ChatProps {
     currentChat: ChatRoom | null; // Now nullable
     messages: Message[];
     isLoading: boolean;
-    currentUser: string;
-    currentUserId: string;
+    currentUser: string; // Current User's Name
+    currentUserId: string; // Current User's ID
     onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void;
     onAddMessage: (newMessage: Message) => void;
     onAddChatRoom: (newRoom: ChatRoom) => void;
@@ -117,23 +119,19 @@ export function Chat({
     setIsClient(true);
     // Simulate fetching initial friends (still needed for the 'Add Room' sheet)
     const timer = setTimeout(() => {
-        // Ensure friends list is consistent
-        const kinectIds = ['1234', '5678', '9012', '3456', '7890'];
-        const updatedFriends = placeholderFriends.map((friend, index) => ({
-            ...friend,
-            kinectId: `KINECT#${kinectIds[index] || Math.floor(1000 + Math.random() * 9000)}` // Add unique ID if missing
-        }));
-        setFriends(updatedFriends);
-        setFilteredFriends(updatedFriends);
-    }, 500); // Shorter delay as main data comes from props
+        // Filter out the current user from the list shown in the "Add Chat" sheet
+        const otherFriends = placeholderFriends.filter(friend => friend.id !== currentUserId);
+        setFriends(otherFriends);
+        setFilteredFriends(otherFriends);
+    }, 300); // Slightly faster load
 
     return () => clearTimeout(timer); // Cleanup timer on unmount
-  }, []);
+  }, [currentUserId]); // Rerun if currentUserId changes (though unlikely in this setup)
 
   // --- Friend Search Logic ---
    useEffect(() => {
        if (!friendSearchTerm) {
-           setFilteredFriends(friends);
+           setFilteredFriends(friends); // Show all *other* friends
            return;
        }
        const lowerCaseTerm = friendSearchTerm.toLowerCase();
@@ -165,7 +163,8 @@ export function Chat({
            } else {
                // If receiving a message from others, only scroll if near the bottom
                const viewport = viewportRef.current;
-               if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
+               // Increased threshold slightly for better UX
+               if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 250) {
                  scrollToBottom('smooth');
                }
            }
@@ -194,12 +193,15 @@ export function Chat({
     setIsSending(true);
     const tempId = `temp-${Date.now()}`;
 
+    // Find current user's avatar from placeholder data (fallback if needed)
+    const currentUserAvatar = placeholderFriends.find(f => f.id === currentUserId)?.avatar || 'https://picsum.photos/seed/user/40/40';
+
     const messageData: Message = {
       id: tempId,
-      sender: currentUser,
+      sender: currentUser, // Use the currentUser name prop
       text: trimmedMessage,
       timestamp: Date.now(),
-      avatar: 'https://picsum.photos/seed/bob/40/40', // Current user's avatar
+      avatar: currentUserAvatar, // Use the fetched/default avatar
     };
 
      // Call the onAddMessage prop function to update state in Home component
@@ -210,23 +212,26 @@ export function Chat({
      // scrollToBottom('smooth'); // Let the useEffect handle scrolling
 
      // Simulate API call delay
-     await new Promise(resolve => setTimeout(resolve, 500));
+     await new Promise(resolve => setTimeout(resolve, 300)); // Faster simulation
      setIsSending(false);
 
      // Simulate a reply only in Global Chat for demo (keep this local if desired)
      if (currentChat.id === 'global') { // Use 'global' id consistently
          setTimeout(() => {
+             const replyingFriend = placeholderFriends.find(f => f.id === 'alice'); // Example: Alice replies
+             if (!replyingFriend) return;
+
              const replyMessage: Message = {
                  id: String(Date.now()),
-                 sender: 'Alice',
+                 sender: replyingFriend.name,
                  text: `Got it, ${currentUser}! 👋`,
                  timestamp: Date.now(),
-                 avatar: 'https://picsum.photos/seed/alice/40/40',
+                 avatar: replyingFriend.avatar,
              };
              // Use onAddMessage for replies too, ensuring state consistency
              onAddMessage(replyMessage);
              // Scroll handled by useEffect
-         }, 1500);
+         }, 1200); // Slightly faster reply
      }
   };
 
@@ -250,9 +255,10 @@ export function Chat({
        }
 
        setIsCreatingChat(true);
-       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate creation
+       await new Promise(resolve => setTimeout(resolve, 700)); // Simulate creation
 
-       const selectedFriendDetails = friends.filter(f => selectedFriends.includes(f.id));
+       // Use the full placeholderFriends list to find details, not the filtered 'friends' state
+       const selectedFriendDetails = placeholderFriends.filter(f => selectedFriends.includes(f.id));
        const participantIds = [currentUserId, ...selectedFriends]; // Include self
        const isGroup = selectedFriends.length > 1;
 
@@ -263,7 +269,7 @@ export function Chat({
                 name: groupName.trim(),
                 type: 'group',
                 participants: participantIds,
-                avatar: `https://picsum.photos/seed/${encodeURIComponent(groupName.trim())}/40/40` // Placeholder avatar based on name
+                avatar: `https://picsum.photos/seed/${encodeURIComponent(groupName.trim().replace(/\s+/g, '-'))}/40/40` // Placeholder avatar based on name
             };
             toast({ title: "Group Chat Created", description: `Started group: ${newChat.name}` });
        } else {
@@ -309,18 +315,26 @@ export function Chat({
    const currentChatDisplay = !currentChat || currentChat.id === 'loading' ? {
        name: 'Loading...',
        avatar: undefined, // Pass undefined instead of empty string
-       fallback: 'L',
+       fallback: '?',
        isOnline: false,
        isGroup: false,
        participantCount: 0,
+       statusText: 'Loading chat details...' // Add a status text
    } : {
        name: currentChat.name,
        avatar: currentChat.avatar || undefined, // Ensure undefined if no avatar
        fallback: currentChat.type === 'group' ? '#' : currentChat.name.charAt(0).toUpperCase(),
-       // Basic online status simulation (only for DMs for now)
-       isOnline: currentChat.type === 'dm' && friends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online',
+       // Find the friend object for DM status
+       dmFriend: currentChat.type === 'dm' ? placeholderFriends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId)) : null,
+       isOnline: currentChat.type === 'dm' ? placeholderFriends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online' : false,
        isGroup: currentChat.type === 'group',
        participantCount: currentChat.participants.length,
+       // Generate status text based on type and online status
+       statusText: currentChat.type === 'group'
+           ? `${currentChat.participants.length} Members`
+           : (placeholderFriends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online' ? 'Online'
+             : placeholderFriends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'ingame' ? 'In Game'
+             : 'Offline')
    };
 
 
@@ -329,25 +343,43 @@ export function Chat({
   return (
     // Use flex-col and h-full to ensure it fills the parent container
     <div className="flex flex-col h-full bg-background">
-      {/* Chat Header */}
-       <CardHeader className="flex flex-row items-center justify-between border-b border-border p-3 sm:p-4 sticky top-0 bg-background/90 backdrop-blur-sm z-10 flex-shrink-0">
+      {/* Chat Header - Added subtle transition */}
+       <CardHeader className="flex flex-row items-center justify-between border-b border-border p-3 sm:p-4 sticky top-0 bg-background/95 backdrop-blur-sm z-10 flex-shrink-0 transition-all duration-150 ease-in-out">
         {/* Chat Switcher Dropdown */}
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring" disabled={!currentChat}>
+                {/* Improved focus and hover states */}
+                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring rounded-md hover:bg-accent" disabled={!currentChat}>
                     <div className="relative">
-                        <Avatar className={cn("h-8 w-8 border-2", currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' ? "border-green-500/70" : "border-border/50")}>
+                         {/* Add pulse animation for loading state */}
+                        <Avatar className={cn(
+                             "h-9 w-9 border-2 transition-colors duration-300",
+                             currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' ? "border-green-500/80" : "border-border/60",
+                             isLoading && "animate-pulse"
+                         )}>
                              {/* Pass undefined or a valid URL to src */}
                             <AvatarImage src={currentChatDisplay.avatar} alt={currentChatDisplay.name} />
-                            <AvatarFallback>{currentChatDisplay.fallback}</AvatarFallback>
+                            <AvatarFallback className="text-sm">{currentChatDisplay.fallback}</AvatarFallback>
                         </Avatar>
-                         {currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' && (
-                            <span className="absolute bottom-[-2px] right-[-2px] block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"></span>
+                         {currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' && !isLoading && (
+                            <span className="absolute bottom-[-2px] right-[-2px] block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background"></span>
+                         )}
+                          {currentChatDisplay.dmFriend?.status === 'ingame' && !isLoading && (
+                            <span className="absolute bottom-[-2px] right-[-2px] block h-3 w-3 rounded-full bg-blue-500 ring-2 ring-background"></span>
                          )}
                     </div>
-                    <CardTitle className="text-base sm:text-lg font-semibold leading-tight truncate max-w-[150px] sm:max-w-[250px]">
-                        {currentChatDisplay.name}
-                    </CardTitle>
+                    {/* Title and status */}
+                    <div className="flex flex-col items-start">
+                        <CardTitle className="text-sm sm:text-base font-semibold leading-tight truncate max-w-[150px] sm:max-w-[250px]">
+                            {currentChatDisplay.name}
+                        </CardTitle>
+                         <span className={cn(
+                             "text-xs leading-tight",
+                              currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' ? "text-green-500" : "text-muted-foreground"
+                         )}>
+                             {currentChatDisplay.statusText}
+                         </span>
+                    </div>
                     <ChevronsUpDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />
                 </Button>
             </DropdownMenuTrigger>
@@ -367,23 +399,24 @@ export function Chat({
                           >
                             {room.type === 'group' ? (
                                 <Avatar className="h-5 w-5 bg-muted text-muted-foreground flex items-center justify-center rounded-sm">
+                                    {/* Use Hash for group indication */}
                                     <Hash className="h-3 w-3" />
                                 </Avatar>
                             ) : (
                                 <Avatar className="h-5 w-5">
                                     {/* Pass undefined or valid URL */}
                                     <AvatarImage src={room.avatar || undefined} alt={room.name} />
-                                    <AvatarFallback>{room.name.charAt(0)}</AvatarFallback>
+                                    <AvatarFallback className="text-xs">{room.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             )}
-                            <span className="truncate">{room.name}</span>
+                            <span className="truncate text-sm">{room.name}</span>
                          </DropdownMenuItem>
                      ))}
                 </DropdownMenuGroup>
                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setIsAddRoomSheetOpen(true)} className="flex items-center gap-2 cursor-pointer">
                       <PlusCircle className="h-4 w-4 text-muted-foreground" />
-                      <span>Create New Chat...</span>
+                      <span className="text-sm">Create New Chat...</span>
                   </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -401,7 +434,8 @@ export function Chat({
                                         <PlusCircle className="h-5 w-5" />
                                     </Button>
                                 </SheetTrigger>
-                                 <SheetContent side="left" className="sm:max-w-sm flex flex-col p-0">
+                                 {/* Adjusted Sheet Content for better spacing and structure */}
+                                 <SheetContent side="left" className="sm:max-w-sm w-[90vw] flex flex-col p-0">
                                     <SheetHeader className="px-4 pt-4 pb-2 border-b">
                                         <SheetTitle>Create New Chat</SheetTitle>
                                         <SheetDescription>
@@ -423,7 +457,7 @@ export function Chat({
 
                                      {/* Group Name Input (Conditional) */}
                                      {selectedFriends.length > 1 && (
-                                        <div className="px-4 pt-4">
+                                        <div className="px-4 pt-4 animate-fade-in">
                                             <Label htmlFor="group-name" className="text-xs font-medium text-muted-foreground">Group Name</Label>
                                             <Input
                                                 id="group-name"
@@ -438,16 +472,20 @@ export function Chat({
 
                                      {/* Friend List */}
                                      <ScrollArea className="flex-1 px-4 py-4">
-                                         {filteredFriends.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-6">No friends found.</p>
-                                         ) : (
+                                         {filteredFriends.length === 0 && !friendSearchTerm && (
+                                              <p className="text-sm text-muted-foreground text-center py-6">No other friends found.</p>
+                                         )}
+                                         {filteredFriends.length === 0 && friendSearchTerm && (
+                                              <p className="text-sm text-muted-foreground text-center py-6">No friends matching "{friendSearchTerm}".</p>
+                                         )}
+                                         {filteredFriends.length > 0 && (
                                             <div className="space-y-3">
                                                 {filteredFriends.map(friend => (
                                                     <div
                                                         key={friend.id}
                                                         className={cn(
-                                                            "flex items-center justify-between p-2 rounded-md transition-colors cursor-pointer hover:bg-muted/50",
-                                                            selectedFriends.includes(friend.id) && "bg-muted"
+                                                            "flex items-center justify-between p-2 rounded-md transition-colors duration-150 cursor-pointer hover:bg-muted/50",
+                                                            selectedFriends.includes(friend.id) && "bg-muted ring-1 ring-primary/50" // Highlight selected
                                                         )}
                                                         onClick={() => handleFriendSelect(friend.id)}
                                                     >
@@ -472,7 +510,7 @@ export function Chat({
                                             </div>
                                          )}
                                     </ScrollArea>
-                                    <SheetFooter className="px-4 pb-4 pt-2 border-t bg-background">
+                                    <SheetFooter className="px-4 pb-4 pt-2 border-t bg-background/95 backdrop-blur-sm">
                                          <SheetClose asChild>
                                              <Button variant="outline" className="flex-1 sm:flex-none">Cancel</Button>
                                          </SheetClose>
@@ -496,7 +534,8 @@ export function Chat({
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="View Chat Members" className="text-muted-foreground hover:text-foreground" disabled={!currentChat || isLoading}>
+                            {/* Placeholder for chat members/profile view */}
+                            <Button variant="ghost" size="icon" aria-label="View Chat Members or Profile" className="text-muted-foreground hover:text-foreground" disabled={!currentChat || isLoading}>
                                 {currentChatDisplay.isGroup ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
@@ -516,55 +555,63 @@ export function Chat({
 
       {/* Chat Messages Area */}
       <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea className="h-full p-4" ref={scrollAreaRef}> {/* Added padding here */}
+        <ScrollArea className="h-full" ref={scrollAreaRef}> {/* Remove padding here */}
           <div ref={viewportRef} className="h-full"> {/* Viewport takes full height */}
-              <div className="space-y-4 pb-4"> {/* Removed padding here */}
+              {/* Added padding within the scrollable content div */}
+              <div className="space-y-4 pb-4 px-4 pt-4">
                 {isLoading ? (
                     // Loading Skeletons
                     <>
                         {[...Array(8)].map((_, i) => (
                            <div key={`skel-${i}`} className={cn("flex gap-3", i % 2 === 0 ? 'justify-start' : 'justify-end')}>
-                               {i % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
-                               <div className={cn("flex flex-col gap-1.5", i % 2 === 0 ? 'items-start' : 'items-end')}>
-                                   <Skeleton className={cn("h-4 w-20", i % 2 !== 0 && 'hidden')} />
+                               {i % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 self-end" />}
+                               <div className={cn("flex flex-col gap-1", i % 2 === 0 ? 'items-start' : 'items-end')}>
+                                   <Skeleton className={cn("h-4 w-20 rounded", i % 2 !== 0 && 'hidden')} />
                                    <Skeleton className={cn("h-10 rounded-lg", i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-32' : 'w-40')} />
                                    {/* Timestamp Skeleton */}
-                                    <span className="text-[10px] opacity-0 mt-1 self-end min-h-[1em]">
-                                        <Skeleton className="h-3 w-10 inline-block" />
-                                    </span>
+                                    <Skeleton className="h-3 w-10 mt-1 self-end rounded" />
                                </div>
-                               {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
+                               {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 self-end" />}
                            </div>
                         ))}
                     </>
                 ) : messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-center pt-20">
-                        <MessageSquare className="h-12 w-12 mb-4 opacity-50" />
-                        <p className="text-lg font-medium">No messages yet</p>
-                        <p className="text-sm">
-                           {currentChat?.type === 'dm' ? `Start chatting with ${currentChat.name}!` : currentChat ? `Start the conversation in ${currentChat.name}!` : 'Select a chat to begin.'}
+                    // Enhanced Empty Chat Placeholder
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-center pt-10 animate-fade-in opacity-0 [--fade-in-delay:300ms]">
+                        <MessageSquare className="h-16 w-16 mb-5 opacity-30" />
+                        <p className="text-xl font-medium mb-1">It's quiet here...</p>
+                        <p className="text-sm max-w-xs">
+                           {currentChat?.type === 'dm' ? `Start the conversation with ${currentChat.name}!` : currentChat ? `Be the first to send a message in ${currentChat.name}!` : 'Select or create a chat to begin.'}
                         </p>
                     </div>
                  ) : (
                     // Actual Messages (using messages prop)
                     messages.map((msg, index) => {
                       const isCurrentUser = msg.sender === currentUser;
-                      const showAvatar = !isCurrentUser && (index === 0 || messages[index - 1]?.sender !== msg.sender);
-                      const nextMessageTimestamp = messages[index + 1]?.timestamp;
-                      const timeDiff = nextMessageTimestamp ? nextMessageTimestamp - msg.timestamp : Infinity;
-                      const showTimestamp = index === messages.length - 1 || messages[index + 1]?.sender !== msg.sender || timeDiff > 5 * 60 * 1000;
+                      // Determine if avatar and sender name should be shown based on previous message
+                      const prevMessage = messages[index - 1];
+                      const showMeta = !prevMessage || prevMessage.sender !== msg.sender || (msg.timestamp - prevMessage.timestamp > 5 * 60 * 1000); // Show if different sender or > 5 mins gap
+
+                      // Determine if timestamp should be shown
+                      const nextMessage = messages[index + 1];
+                      const showTimestamp = !nextMessage || nextMessage.sender !== msg.sender || (nextMessage.timestamp - msg.timestamp > 5 * 60 * 1000);
 
                       return (
                          <div
                           key={msg.id}
-                          className={cn( "flex gap-2", isCurrentUser ? 'justify-end pl-10' : 'justify-start pr-10')}
+                          className={cn(
+                              "flex gap-2",
+                              isCurrentUser ? 'justify-end pl-10 sm:pl-16' : 'justify-start pr-10 sm:pr-16', // Increased padding for space
+                              showMeta ? 'mt-3' : 'mt-1' // Add margin-top if showing meta
+                          )}
                          >
+                           {/* Avatar Column */}
                            <div className="w-8 flex-shrink-0 self-end">
-                            {showAvatar && (
+                            {!isCurrentUser && showMeta && (
                                 <TooltipProvider delayDuration={300}>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Avatar className="h-8 w-8 animate-fade-in opacity-0 [--fade-in-delay:100ms]">
+                                            <Avatar className="h-8 w-8 animate-fade-in opacity-0 [--fade-in-delay:50ms]">
                                                 <AvatarImage src={msg.avatar} alt={msg.sender} />
                                                 <AvatarFallback>{msg.sender.charAt(0)}</AvatarFallback>
                                             </Avatar>
@@ -575,23 +622,36 @@ export function Chat({
                             )}
                            </div>
 
+                            {/* Message Content Column */}
                             <div
                               className={cn(
-                                "max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm relative flex flex-col",
-                                isCurrentUser
-                                  ? 'bg-primary text-primary-foreground rounded-br-none animate-in slide-in-from-right-4 duration-300 ease-out'
-                                  : 'bg-muted text-foreground rounded-bl-none animate-in slide-in-from-left-4 duration-300 ease-out',
-                                (!showAvatar && index > 0 && messages[index-1].sender === msg.sender) ? 'mt-1' : 'mt-0'
+                                "max-w-[85%] sm:max-w-[75%] flex flex-col", // Adjusted max width
+                                isCurrentUser ? 'items-end' : 'items-start'
                               )}
                             >
-                                {showAvatar && !isCurrentUser && currentChat?.type === 'group' && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
-                                <p className="leading-snug break-words">{msg.text}</p>
+                                {/* Sender Name (for group chats) */}
+                                {!isCurrentUser && showMeta && currentChat?.type === 'group' && (
+                                     <p className="text-xs font-semibold mb-0.5 text-primary/80">{msg.sender}</p>
+                                )}
+
+                                {/* Message Bubble */}
+                                <div className={cn(
+                                     "rounded-xl px-3.5 py-2 text-sm shadow-md relative", // Rounded-xl, more padding
+                                     isCurrentUser
+                                      ? 'bg-gradient-to-br from-primary/90 to-primary text-primary-foreground rounded-br-sm animate-in slide-in-from-right-5 duration-300 ease-out'
+                                      : 'bg-muted text-foreground rounded-bl-sm animate-in slide-in-from-left-5 duration-300 ease-out'
+                                  )}>
+                                    <p className="leading-snug break-words whitespace-pre-wrap">{msg.text}</p>
+                                </div>
+
+                                {/* Timestamp */}
                                 {isClient && (
                                     <span className={cn(
-                                        "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]",
-                                        showTimestamp ? 'opacity-60' : 'opacity-0'
+                                        "text-[10px] opacity-0 mt-1 px-1 transition-opacity duration-300",
+                                        showTimestamp ? 'opacity-60' : 'h-[1em]', // Use height to reserve space when hidden
+                                        isCurrentUser ? 'self-end' : 'self-start'
                                     )}>
-                                       {format(new Date(msg.timestamp), 'p')}
+                                       {showTimestamp ? format(new Date(msg.timestamp), 'p') : ''}
                                     </span>
                                 )}
                             </div>
@@ -604,14 +664,14 @@ export function Chat({
         </ScrollArea>
       </CardContent>
 
-      {/* Chat Input Bar */}
-      <div className="p-2 sm:p-4 border-t border-border bg-background flex-shrink-0">
+      {/* Chat Input Bar - Added subtle background */}
+      <div className="p-2 sm:p-3 border-t border-border bg-background/90 backdrop-blur-sm flex-shrink-0">
          {isClient ? (
            <TooltipProvider delayDuration={200}>
              <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-1 sm:space-x-2">
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
+                        <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
                             <Smile className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -619,15 +679,25 @@ export function Chat({
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file" className="text-muted-foreground hover:text-accent-foreground" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
+                        {/* Basic file input trigger */}
+                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isLoading || !currentChat || currentChat.id === 'loading'} onClick={() => document.getElementById('file-input')?.click()}>
                             <Paperclip className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Attach file/image</TooltipContent>
                 </Tooltip>
+                 {/* Hidden file input */}
+                 <input id="file-input" type="file" className="hidden" onChange={(e) => {
+                     const file = e.target.files?.[0];
+                     if (file) {
+                         toast({title: "File Selected", description: `${file.name} ready to attach (feature not fully implemented).`});
+                         // Handle file upload/preview logic here
+                     }
+                     e.target.value = ''; // Reset input
+                 }} />
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="AI Assistant" className="text-muted-foreground hover:text-accent-foreground" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
+                        <Button variant="ghost" size="icon" type="button" aria-label="AI Assistant" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
                             <Bot className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -636,10 +706,10 @@ export function Chat({
 
                 <Input
                     type="text"
-                    placeholder={currentChat && currentChat.id !== 'loading' ? "Type a message..." : "Select a chat"}
+                    placeholder={currentChat && currentChat.id !== 'loading' ? `Message ${currentChat.name}...` : "Select a chat"}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="flex-1 bg-muted/50 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200"
+                    className="flex-1 bg-muted/60 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200 border-transparent focus:bg-background" // Subtle style changes
                     aria-label="Chat message input"
                     disabled={isSending || isLoading || !currentChat || currentChat.id === 'loading'} // Disable while sending or loading chats or if no chat selected
                     autoComplete="off"
@@ -647,7 +717,7 @@ export function Chat({
 
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0" aria-label="Send message" disabled={isSending || !newMessage.trim() || isLoading || !currentChat || currentChat.id === 'loading'}>
+                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0 interactive-hover" aria-label="Send message" disabled={isSending || !newMessage.trim() || isLoading || !currentChat || currentChat.id === 'loading'}>
                              {isSending ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
                              ) : (
@@ -660,10 +730,11 @@ export function Chat({
             </form>
           </TooltipProvider>
          ) : (
-            <div className="flex w-full items-center space-x-2">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <Skeleton className="h-10 w-10 rounded-full" />
+            // Skeleton for Input Bar
+            <div className="flex w-full items-center space-x-2 h-10">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <Skeleton className="h-9 w-9 rounded-full" />
                 <Skeleton className="h-10 flex-1 rounded-full" />
                 <Skeleton className="h-10 w-10 rounded-full" />
             </div>
