@@ -124,7 +124,7 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
 
   }, [initialSnapPosition]); // Add initialSnapPosition dependency
 
-  const resetFabPositionToSnap = (snapPos: NavSnapPosition) => {
+  const resetFabPositionToSnap = useCallback((snapPos: NavSnapPosition) => {
       if (typeof window === 'undefined') return; // Guard against SSR
       const { innerWidth, innerHeight } = window;
       let newPos = { top: 0, left: 0 };
@@ -146,7 +146,7 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
               break;
       }
        setFabPosition(newPos);
-  };
+  }, []); // Removed dependencies that caused infinite loop
 
 
   // Save FAB position to localStorage whenever it changes
@@ -156,19 +156,24 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
       }
   }, [fabPosition, hasMounted]);
 
-  // Save snap position to localStorage
+  // Save snap position to localStorage and reset FAB position when snap changes
    useEffect(() => {
        if (hasMounted) {
          localStorage.setItem('navSnapPosition', snapPosition);
          // When snap position changes (e.g., via settings), reset FAB position
          resetFabPositionToSnap(snapPosition);
        }
-   }, [snapPosition, hasMounted]); // Removed resetFabPositionToSnap from dependencies
+   }, [snapPosition, hasMounted, resetFabPositionToSnap]); // Added resetFabPositionToSnap
 
 
   // --- Drag Handlers ---
   const handleDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     if (!fabRef.current) return;
+
+    // Close the nav menu if it's open when starting a drag
+    if (isNavOpen) {
+      setIsNavOpen(false);
+    }
 
     setIsDragging(true);
     fabRef.current.style.transition = 'none'; // Disable transitions during drag
@@ -243,7 +248,8 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
     // Determine the closest corner and snap
     snapToCorner();
 
-  }, [isDragging, handleDragging, snapPosition]); // Added snapPosition dependency
+  }, [isDragging, handleDragging, snapToCorner]); // Use snapToCorner
+
 
   const snapToCorner = useCallback(() => {
       if (typeof window === 'undefined') return; // Guard against SSR
@@ -321,30 +327,32 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
       }
 
       const menuHeight = navItems.length * MENU_ITEM_SIZE + (navItems.length -1) * MENU_GAP;
+      const fabTop = fabPosition.top;
+      const fabLeft = fabPosition.left;
 
       switch (snapPosition) {
           case 'top-left':
-              style.top = `${fabPosition.top + FAB_SIZE + MENU_GAP}px`;
-              style.left = `${fabPosition.left}px`;
+              style.top = `${fabTop + FAB_SIZE + MENU_GAP}px`;
+              style.left = `${fabLeft}px`;
               style.alignItems = 'flex-start';
               style.transformOrigin = 'top left';
               break;
           case 'top-right':
-              style.top = `${fabPosition.top + FAB_SIZE + MENU_GAP}px`;
-              style.left = `${fabPosition.left + FAB_SIZE - MENU_ITEM_SIZE}px`; // Align right edges
+              style.top = `${fabTop + FAB_SIZE + MENU_GAP}px`;
+              style.left = `${fabLeft + FAB_SIZE - MENU_ITEM_SIZE}px`; // Align right edges
               style.alignItems = 'flex-end';
                style.transformOrigin = 'top right';
               break;
           case 'bottom-left':
-              style.top = `${fabPosition.top - menuHeight - MENU_GAP}px`;
-              style.left = `${fabPosition.left}px`;
+              style.top = `${fabTop - menuHeight - MENU_GAP}px`;
+              style.left = `${fabLeft}px`;
               style.alignItems = 'flex-start';
                style.transformOrigin = 'bottom left';
               break;
           case 'bottom-right':
           default:
-              style.top = `${fabPosition.top - menuHeight - MENU_GAP}px`;
-              style.left = `${fabPosition.left + FAB_SIZE - MENU_ITEM_SIZE}px`; // Align right edges
+              style.top = `${fabTop - menuHeight - MENU_GAP}px`;
+              style.left = `${fabLeft + FAB_SIZE - MENU_ITEM_SIZE}px`; // Align right edges
               style.alignItems = 'flex-end';
                style.transformOrigin = 'bottom right';
               break;
