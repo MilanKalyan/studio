@@ -90,41 +90,7 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
   ];
 
   // --- Initialization and Saving Position ---
-  useEffect(() => {
-    setHasMounted(true); // Indicate component has mounted on client
-    const savedFabPos = localStorage.getItem('fabPosition');
-    const savedSnapPos = localStorage.getItem('navSnapPosition') as NavSnapPosition | null;
-
-    if (savedSnapPos && snapPositionStyles[savedSnapPos]) {
-        setSnapPosition(savedSnapPos);
-    }
-
-    if (savedFabPos) {
-      try {
-        const pos = JSON.parse(savedFabPos);
-        // Basic validation
-        if (typeof pos.top === 'number' && typeof pos.left === 'number') {
-            // Ensure position is within bounds on load
-            const { innerWidth, innerHeight } = window;
-            pos.top = Math.max(16, Math.min(pos.top, innerHeight - FAB_SIZE - 16)); // 16px padding
-            pos.left = Math.max(16, Math.min(pos.left, innerWidth - FAB_SIZE - 16));
-            setFabPosition(pos);
-        } else {
-            // If invalid data, reset to default based on snap position
-             resetFabPositionToSnap(savedSnapPos || initialSnapPosition);
-        }
-      } catch (e) {
-        console.error("Failed to parse saved FAB position", e);
-         resetFabPositionToSnap(savedSnapPos || initialSnapPosition);
-      }
-    } else {
-        // No saved position, set initial based on snap position
-        resetFabPositionToSnap(savedSnapPos || initialSnapPosition);
-    }
-
-  }, [initialSnapPosition]); // Add initialSnapPosition dependency
-
-  const resetFabPositionToSnap = useCallback((snapPos: NavSnapPosition) => {
+    const resetFabPositionToSnap = useCallback((snapPos: NavSnapPosition) => {
       if (typeof window === 'undefined') return; // Guard against SSR
       const { innerWidth, innerHeight } = window;
       let newPos = { top: 0, left: 0 };
@@ -147,6 +113,39 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
       }
        setFabPosition(newPos);
   }, []); // Removed dependencies that caused infinite loop
+
+  useEffect(() => {
+    setHasMounted(true); // Indicate component has mounted on client
+    const savedFabPos = localStorage.getItem('fabPosition');
+    const savedSnapPos = localStorage.getItem('navSnapPosition') as NavSnapPosition | null;
+    let effectiveSnapPos = savedSnapPos && snapPositionStyles[savedSnapPos] ? savedSnapPos : initialSnapPosition;
+
+    setSnapPosition(effectiveSnapPos); // Set snap position state first
+
+    if (savedFabPos) {
+      try {
+        const pos = JSON.parse(savedFabPos);
+        // Basic validation
+        if (typeof pos.top === 'number' && typeof pos.left === 'number') {
+            // Ensure position is within bounds on load
+            const { innerWidth, innerHeight } = window;
+            pos.top = Math.max(16, Math.min(pos.top, innerHeight - FAB_SIZE - 16)); // 16px padding
+            pos.left = Math.max(16, Math.min(pos.left, innerWidth - FAB_SIZE - 16));
+            setFabPosition(pos);
+        } else {
+            // If invalid data, reset to default based on snap position
+             resetFabPositionToSnap(effectiveSnapPos);
+        }
+      } catch (e) {
+        console.error("Failed to parse saved FAB position", e);
+         resetFabPositionToSnap(effectiveSnapPos);
+      }
+    } else {
+        // No saved position, set initial based on snap position
+        resetFabPositionToSnap(effectiveSnapPos);
+    }
+
+  }, [initialSnapPosition, resetFabPositionToSnap]); // Depend on initialSnapPosition and reset function
 
 
   // Save FAB position to localStorage whenever it changes
@@ -230,28 +229,8 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
 
   }, [isDragging, dragOffset]);
 
-  const handleDragEnd = useCallback(() => {
-    if (!isDragging) return;
-
-    setIsDragging(false);
-    if (fabRef.current) {
-        fabRef.current.style.transition = ''; // Re-enable transitions
-        fabRef.current.style.cursor = 'grab'; // Restore cursor
-    }
-
-    // Remove global listeners
-    document.removeEventListener('mousemove', handleDragging);
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchmove', handleDragging);
-    document.removeEventListener('touchend', handleDragEnd);
-
-    // Determine the closest corner and snap
-    snapToCorner();
-
-  }, [isDragging, handleDragging, snapToCorner]); // Use snapToCorner
-
-
-  const snapToCorner = useCallback(() => {
+   // Define snapToCorner before handleDragEnd
+   const snapToCorner = useCallback(() => {
       if (typeof window === 'undefined') return; // Guard against SSR
       const { innerWidth, innerHeight } = window;
       const centerX = innerWidth / 2;
@@ -272,6 +251,26 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
       setSnapPosition(newSnapPosition); // This will trigger the useEffect to reset position and save
   }, [fabPosition]); // Added fabPosition dependency
 
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDragging) return;
+
+    setIsDragging(false);
+    if (fabRef.current) {
+        fabRef.current.style.transition = ''; // Re-enable transitions
+        fabRef.current.style.cursor = 'grab'; // Restore cursor
+    }
+
+    // Remove global listeners
+    document.removeEventListener('mousemove', handleDragging);
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragging);
+    document.removeEventListener('touchend', handleDragEnd);
+
+    // Determine the closest corner and snap
+    snapToCorner();
+
+  }, [isDragging, handleDragging, snapToCorner]); // Use snapToCorner
 
   // --- Navigation Logic ---
   const handleNavigation = (item: NavItem) => {
