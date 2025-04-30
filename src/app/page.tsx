@@ -7,6 +7,7 @@ import { GameLobby } from '@/components/game-lobby'; // Import GameLobby
 import LoginPage from './auth/login/page'; // Import the Login page
 import Loading from './loading'; // Import the Loading component
 import { BottomNavigation } from '@/components/bottom-navigation'; // Import BottomNavigation
+import { Card } from '@/components/ui/card'; // Import Card
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null initially, then boolean
@@ -64,18 +65,20 @@ export default function Home() {
 
   // Render main app layout if authenticated
   return (
-    <div className="flex flex-col h-screen"> {/* Use h-screen for full height */}
-       {/* Main Content Area - Use flex-1 to take remaining space */}
-       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0 overflow-hidden">
-         {/* Chat Area - Takes 2 columns on large screens */}
-         <div className="lg:col-span-2 h-full overflow-y-auto border-r border-border">
-           <Chat />
-         </div>
-         {/* Game Lobby Area - Takes 1 column on large screens */}
-         <div className="hidden lg:flex lg:col-span-1 h-full overflow-y-auto"> {/* Hide on smaller screens, flex on large */}
-           <GameLobby />
-         </div>
-       </div>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10"> {/* Use h-screen for full height */}
+       {/* Main Content Area - Use flex-1 to take remaining space, add padding-bottom for nav */}
+       <main className="flex-1 overflow-hidden p-2 md:p-4 pb-20"> {/* Adjusted padding, added pb-20 (h-16 + padding) */}
+         <Card className="h-full w-full shadow-xl border-primary/10 overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-0">
+             {/* Chat Area - Takes full height within Card */}
+             <div className="lg:col-span-2 h-full overflow-hidden border-r border-border/50">
+               <Chat />
+             </div>
+             {/* Game Lobby Area - Takes full height within Card */}
+             <div className="hidden lg:flex lg:col-span-1 h-full overflow-hidden"> {/* Hide on smaller screens */}
+               <GameLobby />
+             </div>
+         </Card>
+       </main>
 
        {/* Bottom Navigation */}
        {/* Pass handleLogout to BottomNavigation -> SettingsContent */}

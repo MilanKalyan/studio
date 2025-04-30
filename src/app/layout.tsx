@@ -4,7 +4,6 @@ import { GeistSans } from 'geist/font/sans'; // Correct import for Geist Sans
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
-// Removed BottomNavigation import, it's handled conditionally in page.tsx
 import Loading from './loading'; // Import the loading component
 
 // Define font variables
@@ -30,8 +29,8 @@ export default function RootLayout({
       >
          {/* Wrap children with Suspense for route loading states */}
          <Suspense fallback={<Loading />}>
-            {/* Main content area takes remaining space */}
-            <main className="flex-1 overflow-y-auto">{children}</main>
+            {/* Main content area takes remaining space - removed overflow-y-auto */}
+            <main className="flex-1">{children}</main>
          </Suspense>
          {/* BottomNavigation is now rendered conditionally within page.tsx when authenticated */}
         <Toaster />
