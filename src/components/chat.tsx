@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,14 @@ export function Chat() {
     { id: '3', sender: 'Alice', text: 'Not much, just checking out Kinect. Wanna play Tic Tac Toe?', timestamp: Date.now(), avatar: 'https://picsum.photos/seed/alice/40/40' },
   ]);
   const [newMessage, setNewMessage] = useState('');
+  const [isClient, setIsClient] = useState(false); // State to track client-side mount
   const currentUser = 'Bob'; // Assume current user is Bob for display logic
+
+  useEffect(() => {
+    // Set isClient to true after component mounts
+    setIsClient(true);
+  }, []);
+
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,9 +86,9 @@ export function Chat() {
                 >
                   {msg.sender !== currentUser && <p className="font-semibold text-xs mb-1 opacity-80">{msg.sender}</p>}
                   <p>{msg.text}</p>
-                  <p className="text-xs opacity-60 mt-1 text-right">
-                    {/* Use date-fns format for consistent time formatting */}
-                    {format(new Date(msg.timestamp), 'p')}
+                  <p className="text-xs opacity-60 mt-1 text-right min-h-[1em]"> {/* Add min-height to prevent layout shift */}
+                    {/* Use date-fns format for consistent time formatting, only render on client */}
+                    {isClient ? format(new Date(msg.timestamp), 'p') : ''}
                   </p>
                 </div>
                  {msg.sender === currentUser && (
