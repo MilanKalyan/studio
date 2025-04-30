@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,20 @@ export function Chat() {
   ]);
   const [newMessage, setNewMessage] = useState('');
   const [isClient, setIsClient] = useState(false); // State to track client-side mount
+  const scrollAreaRef = useRef<HTMLDivElement>(null); // Ref for scroll area view port
   const currentUser = 'Bob'; // Assume current user is Bob for display logic
 
   useEffect(() => {
     // Set isClient to true after component mounts
     setIsClient(true);
+     // Scroll to bottom initially when component mounts and client is ready
+    if (scrollAreaRef.current) {
+       // Access the viewport element within the ScrollArea component
+      const viewport = scrollAreaRef.current.querySelector(':scope > div');
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight });
+      }
+    }
   }, []);
 
 
@@ -45,6 +54,18 @@ export function Chat() {
       };
       setMessages([...messages, message]);
       setNewMessage('');
+
+      // Scroll to bottom after sending a message using the viewport
+       // Use timeout to ensure the DOM has updated with the new message
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+            const viewport = scrollAreaRef.current.querySelector(':scope > div');
+            if (viewport) {
+              viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+            }
+        }
+      }, 0);
+
       // Here you would typically send the message to a backend/WebSocket
     }
   };
@@ -62,7 +83,8 @@ export function Chat() {
         </Button>
       </CardHeader>
       <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea className="h-full p-4">
+        {/* Pass the ref to the ScrollArea component */}
+        <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
           <div className="space-y-4">
             {messages.map((msg) => (
               <div
