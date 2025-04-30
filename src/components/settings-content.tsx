@@ -16,13 +16,13 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-// Define position type, must match the one in bottom-navigation.tsx
-type NavPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+// Define snap position type, must match the one in bottom-navigation.tsx
+type NavSnapPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 interface SettingsContentProps {
     onLogout: () => void;
-    setNavPosition: (position: NavPosition) => void; // Callback to change nav position in the parent
-    currentNavPosition: NavPosition; // Current position to set default value of RadioGroup
+    setNavPosition: (position: NavSnapPosition) => void; // Callback to change nav snap position
+    currentNavPosition: NavSnapPosition; // Current snap position
 }
 
 
@@ -63,6 +63,20 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
                      avatar: "https://picsum.photos/seed/bob/100/100",
                      kinectId: `KINECT#${randomIdPart}` // Assign generated ID
                  });
+                 // Load saved theme preference
+                 const savedTheme = localStorage.getItem('theme') || 'dark';
+                 setSettings(prev => ({ ...prev, theme: savedTheme }));
+                 // Apply initial theme based on saved preference or system
+                 if (typeof window !== 'undefined') {
+                     document.documentElement.classList.remove('light', 'dark');
+                     if (savedTheme === 'system') {
+                         const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                         document.documentElement.classList.add(systemPrefersDark ? 'dark' : 'light');
+                     } else {
+                         document.documentElement.classList.add(savedTheme);
+                     }
+                 }
+
             }, 1000); // Simulate 1 second delay
             return () => clearTimeout(timer);
        }
@@ -120,11 +134,10 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
     };
 
     // Handle navigation position change using the passed function
-    const handleNavPositionChange = (value: NavPosition) => {
+    const handleNavPositionChange = (value: NavSnapPosition) => {
         setNavPosition(value); // Call the callback passed from props
-        // Optionally save this preference (e.g., in localStorage)
-        localStorage.setItem('navPosition', value);
-        toast({ title: "Navigation Position Updated", description: `Moved menu to ${value.replace('-', ' ')}.`, duration: 2000 });
+        // localStorage saving is handled in bottom-navigation.tsx now
+        toast({ title: "Navigation Snap Updated", description: `Menu will now snap to ${value.replace('-', ' ')}. Drag to move.`, duration: 2500 });
     }
 
 
@@ -253,15 +266,15 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
 
           {/* Navigation Position Control */}
           <div className="space-y-3">
-            <Label className="flex items-center gap-2"><Move className="h-4 w-4"/> Navigation Menu Position</Label>
+            <Label className="flex items-center gap-2"><Move className="h-4 w-4"/> Navigation Snap Corner</Label>
              {/* Use currentNavPosition for defaultValue and onValueChange to update via prop */}
             <RadioGroup
                 value={currentNavPosition} // Controlled component using the prop
-                onValueChange={(value) => handleNavPositionChange(value as NavPosition)} // Call the passed setter
+                onValueChange={(value) => handleNavPositionChange(value as NavSnapPosition)} // Call the passed setter
                 className="grid grid-cols-2 gap-x-4 gap-y-2" // Adjusted gap
                 disabled={!isClient}
              >
-              {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as NavPosition[]).map((pos) => (
+              {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as NavSnapPosition[]).map((pos) => (
                 <div key={pos} className="flex items-center space-x-2">
                   <RadioGroupItem value={pos} id={`nav-pos-${pos}`} />
                   <Label htmlFor={`nav-pos-${pos}`} className="capitalize text-sm font-normal cursor-pointer">
@@ -270,7 +283,7 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
                 </div>
               ))}
             </RadioGroup>
-             <p className="text-xs text-muted-foreground">Tip: Rapidly click the menu button 5 times to cycle positions!</p>
+             <p className="text-xs text-muted-foreground">This sets the corner the navigation menu snaps back to after dragging.</p>
           </div>
            {/* Add more appearance settings like font size, chat density etc. */}
         </CardContent>
@@ -321,3 +334,5 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
     </div>
   );
 }
+
+    

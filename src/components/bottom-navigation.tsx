@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, MessageCircle, LayoutGrid, Gamepad2, Compass, Settings, User, X as CloseIcon } from 'lucide-react';
+import { Home, MessageCircle, LayoutGrid, Gamepad2, Compass, Settings, User, X as CloseIcon, Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sheet";
 import { GameLobbyContent } from './game-lobby-content';
 import { MySpaceContent } from './my-space-content';
-import { SettingsContent } from './settings-content'; // Ensure this component accepts onLogout
+import { SettingsContent } from './settings-content';
 
 interface NavItemBase {
   id: string;
@@ -39,200 +39,384 @@ interface NavItemSheet extends NavItemBase {
 
 type NavItem = NavItemLink | NavItemSheet;
 
-type NavPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+// Still useful for menu expansion direction and tooltip side
+type NavSnapPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 interface BottomNavigationProps {
-  onLogout: () => void; // Add onLogout prop
-  initialPosition?: NavPosition; // Allow setting initial position
+  onLogout: () => void;
+  initialSnapPosition?: NavSnapPosition; // Represents the corner the FAB snaps to
 }
 
-// Mappings for position styles
-const positionStyles: Record<NavPosition, { fab: string; menu: string; tooltipSide: 'left' | 'right' | 'top' | 'bottom' }> = {
-  'bottom-right': {
-    fab: 'bottom-4 right-4',
-    menu: 'bottom-[76px] right-4 items-end',
-    tooltipSide: 'left',
-  },
-  'bottom-left': {
-    fab: 'bottom-4 left-4',
-    menu: 'bottom-[76px] left-4 items-start',
-    tooltipSide: 'right',
-  },
-  'top-right': {
-    fab: 'top-4 right-4',
-    menu: 'top-[76px] right-4 items-end',
-    tooltipSide: 'left',
-  },
-  'top-left': {
-    fab: 'top-4 left-4',
-    menu: 'top-[76px] left-4 items-start',
-    tooltipSide: 'right',
-  },
+// Styles based on snap position, mostly for menu expansion and tooltip
+const snapPositionStyles: Record<NavSnapPosition, { menuDirection: string; tooltipSide: 'left' | 'right' | 'top' | 'bottom' }> = {
+  'bottom-right': { menuDirection: 'bottom-[76px] right-4 items-end', tooltipSide: 'left' },
+  'bottom-left': { menuDirection: 'bottom-[76px] left-4 items-start', tooltipSide: 'right' },
+  'top-right': { menuDirection: 'top-[76px] right-4 items-end', tooltipSide: 'left' },
+  'top-left': { menuDirection: 'top-[76px] left-4 items-start', tooltipSide: 'right' },
 };
 
-export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }: BottomNavigationProps) {
+// Default FAB starting position (adjust as needed)
+const DEFAULT_FAB_POS = { top: 'auto', right: '1rem', bottom: '1rem', left: 'auto' };
+const FAB_SIZE = 56; // Approx size of the FAB (w-14 h-14 = 56px)
+const MENU_ITEM_SIZE = 48; // Approx size of menu items (w-12 h-12 = 48px)
+const MENU_GAP = 12; // Gap between menu items (gap-3)
+
+
+export function BottomNavigation({ onLogout, initialSnapPosition = 'bottom-right' }: BottomNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [openSheet, setOpenSheet] = useState<string | null>(null);
-  const [isNavOpen, setIsNavOpen] = useState(false); // State for the main circle toggle
-  const [navPosition, setNavPosition] = useState<NavPosition>(() => {
-      // Try to get position from localStorage, default to initialPosition
-      if (typeof window !== 'undefined') {
-          const savedPosition = localStorage.getItem('navPosition') as NavPosition | null;
-          return savedPosition && positionStyles[savedPosition] ? savedPosition : initialPosition;
-      }
-      return initialPosition;
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [snapPosition, setSnapPosition] = useState<NavSnapPosition>(() => {
+    if (typeof window !== 'undefined') {
+      const savedPosition = localStorage.getItem('navSnapPosition') as NavSnapPosition | null;
+      return savedPosition && snapPositionStyles[savedPosition] ? savedPosition : initialSnapPosition;
+    }
+    return initialSnapPosition;
   });
+  const [fabPosition, setFabPosition] = useState({ top: 0, left: 0 }); // Current pixel position
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const fabRef = useRef<HTMLDivElement>(null);
+  const [hasMounted, setHasMounted] = useState(false); // Track client-side mount
 
-  // Example: Allow cycling through positions by clicking the FAB 5 times quickly (demo purpose)
-  // In a real app, this would be controlled via settings
-  const [clickCount, setClickCount] = useState(0);
-  const [lastClickTime, setLastClickTime] = useState(0);
-
-  useEffect(() => {
-    // Reset click count if too much time passes
-    if (Date.now() - lastClickTime > 1000) {
-      setClickCount(0);
-    }
-  }, [lastClickTime]);
-
-  const cyclePosition = () => {
-    const positions: NavPosition[] = ['bottom-right', 'bottom-left', 'top-left', 'top-right'];
-    const currentIndex = positions.indexOf(navPosition);
-    const nextIndex = (currentIndex + 1) % positions.length;
-    const nextPosition = positions[nextIndex];
-    setNavPosition(nextPosition);
-    localStorage.setItem('navPosition', nextPosition); // Save new position
-    setClickCount(0); // Reset count after cycling
-  };
-
-  const handleFabClick = () => {
-    const now = Date.now();
-    if (now - lastClickTime < 300) { // Check for rapid clicks (e.g., within 300ms)
-      const newCount = clickCount + 1;
-      setClickCount(newCount);
-      if (newCount >= 4) { // Cycle after 5 rapid clicks (0, 1, 2, 3, 4)
-        cyclePosition();
-        setIsNavOpen(false); // Close nav after cycling
-      } else {
-         toggleNav(); // Normal toggle if not cycling
-      }
-    } else {
-      setClickCount(0); // Reset count if click is slow
-      toggleNav(); // Normal toggle
-    }
-    setLastClickTime(now);
-  };
-  // End demo cycle logic
-
-  // Define nav items inside the component to access onLogout
+  // Define nav items inside the component
   const navItems: NavItem[] = [
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/' },
-    {
-      id: 'myspace',
-      label: 'My Space',
-      icon: LayoutGrid,
-      isSheet: true,
-      sheetContent: MySpaceContent,
-      sheetTitle: 'My Space',
-    },
-    {
-      id: 'games',
-      label: 'Games',
-      icon: Gamepad2,
-      isSheet: true,
-      sheetContent: GameLobbyContent,
-      sheetTitle: 'Game Lobby',
-    },
+    { id: 'myspace', label: 'My Space', icon: LayoutGrid, isSheet: true, sheetContent: MySpaceContent, sheetTitle: 'My Space' },
+    { id: 'games', label: 'Games', icon: Gamepad2, isSheet: true, sheetContent: GameLobbyContent, sheetTitle: 'Game Lobby' },
     { id: 'browse', label: 'Browse', icon: Compass, path: '/browse' },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Settings,
-      isSheet: true,
-      // Pass setNavPosition to settings to allow changing position
-      sheetContent: (props) => <SettingsContent {...props} setNavPosition={setNavPosition} currentNavPosition={navPosition} />,
-      sheetProps: { onLogout }, // Pass onLogout to SettingsContent
-      sheetTitle: 'Settings',
-    },
+    { id: 'settings', label: 'Settings', icon: Settings, isSheet: true, sheetContent: (props) => <SettingsContent {...props} setNavPosition={setSnapPosition} currentNavPosition={snapPosition} />, sheetProps: { onLogout }, sheetTitle: 'Settings' },
   ];
 
+  // --- Initialization and Saving Position ---
+  useEffect(() => {
+    setHasMounted(true); // Indicate component has mounted on client
+    const savedFabPos = localStorage.getItem('fabPosition');
+    const savedSnapPos = localStorage.getItem('navSnapPosition') as NavSnapPosition | null;
+
+    if (savedSnapPos && snapPositionStyles[savedSnapPos]) {
+        setSnapPosition(savedSnapPos);
+    }
+
+    if (savedFabPos) {
+      try {
+        const pos = JSON.parse(savedFabPos);
+        // Basic validation
+        if (typeof pos.top === 'number' && typeof pos.left === 'number') {
+            // Ensure position is within bounds on load
+            const { innerWidth, innerHeight } = window;
+            pos.top = Math.max(16, Math.min(pos.top, innerHeight - FAB_SIZE - 16)); // 16px padding
+            pos.left = Math.max(16, Math.min(pos.left, innerWidth - FAB_SIZE - 16));
+            setFabPosition(pos);
+        } else {
+            // If invalid data, reset to default based on snap position
+             resetFabPositionToSnap(savedSnapPos || initialSnapPosition);
+        }
+      } catch (e) {
+        console.error("Failed to parse saved FAB position", e);
+         resetFabPositionToSnap(savedSnapPos || initialSnapPosition);
+      }
+    } else {
+        // No saved position, set initial based on snap position
+        resetFabPositionToSnap(savedSnapPos || initialSnapPosition);
+    }
+
+  }, [initialSnapPosition]); // Add initialSnapPosition dependency
+
+  const resetFabPositionToSnap = (snapPos: NavSnapPosition) => {
+      const { innerWidth, innerHeight } = window;
+      let newPos = { top: 0, left: 0 };
+      const padding = 16; // 1rem = 16px
+
+      switch (snapPos) {
+          case 'top-left':
+              newPos = { top: padding, left: padding };
+              break;
+          case 'top-right':
+              newPos = { top: padding, left: innerWidth - FAB_SIZE - padding };
+              break;
+          case 'bottom-left':
+              newPos = { top: innerHeight - FAB_SIZE - padding, left: padding };
+              break;
+          case 'bottom-right':
+          default:
+              newPos = { top: innerHeight - FAB_SIZE - padding, left: innerWidth - FAB_SIZE - padding };
+              break;
+      }
+       setFabPosition(newPos);
+  };
+
+
+  // Save FAB position to localStorage whenever it changes
+  useEffect(() => {
+      if (hasMounted && fabPosition.top !== 0 && fabPosition.left !== 0) { // Avoid saving initial 0,0
+         localStorage.setItem('fabPosition', JSON.stringify(fabPosition));
+      }
+  }, [fabPosition, hasMounted]);
+
+  // Save snap position to localStorage
+   useEffect(() => {
+       if (hasMounted) {
+         localStorage.setItem('navSnapPosition', snapPosition);
+         // When snap position changes (e.g., via settings), reset FAB position
+         resetFabPositionToSnap(snapPosition);
+       }
+   }, [snapPosition, hasMounted]); // Removed resetFabPositionToSnap from dependencies
+
+
+  // --- Drag Handlers ---
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!fabRef.current) return;
+
+    setIsDragging(true);
+    fabRef.current.style.transition = 'none'; // Disable transitions during drag
+    fabRef.current.style.cursor = 'grabbing'; // Change cursor
+
+    const fabRect = fabRef.current.getBoundingClientRect();
+    let clientX, clientY;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+      e.preventDefault(); // Prevent text selection etc. during mouse drag
+    }
+
+    setDragOffset({
+      x: clientX - fabRect.left,
+      y: clientY - fabRect.top,
+    });
+
+    // Add global listeners
+    document.addEventListener('mousemove', handleDragging);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragging, { passive: false }); // Allow preventDefault
+    document.addEventListener('touchend', handleDragEnd);
+  };
+
+  const handleDragging = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDragging) return;
+
+    e.preventDefault(); // Prevent scrolling on touch devices
+
+    let clientX, clientY;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const { innerWidth, innerHeight } = window;
+    let newTop = clientY - dragOffset.y;
+    let newLeft = clientX - dragOffset.x;
+
+    // Constrain within viewport boundaries (with padding)
+    const padding = 16; // 1rem
+    newTop = Math.max(padding, Math.min(newTop, innerHeight - FAB_SIZE - padding));
+    newLeft = Math.max(padding, Math.min(newLeft, innerWidth - FAB_SIZE - padding));
+
+    setFabPosition({ top: newTop, left: newLeft });
+
+  }, [isDragging, dragOffset]);
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDragging) return;
+
+    setIsDragging(false);
+    if (fabRef.current) {
+        fabRef.current.style.transition = ''; // Re-enable transitions
+        fabRef.current.style.cursor = 'grab'; // Restore cursor
+    }
+
+    // Remove global listeners
+    document.removeEventListener('mousemove', handleDragging);
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragging);
+    document.removeEventListener('touchend', handleDragEnd);
+
+    // Determine the closest corner and snap
+    snapToCorner();
+
+  }, [isDragging, handleDragging]); // Added handleDragging dependency
+
+  const snapToCorner = () => {
+      const { innerWidth, innerHeight } = window;
+      const centerX = innerWidth / 2;
+      const centerY = innerHeight / 2;
+      const currentFabCenter = {
+          x: fabPosition.left + FAB_SIZE / 2,
+          y: fabPosition.top + FAB_SIZE / 2,
+      };
+
+      let newSnapPosition: NavSnapPosition;
+
+      if (currentFabCenter.y < centerY) { // Top half
+          newSnapPosition = currentFabCenter.x < centerX ? 'top-left' : 'top-right';
+      } else { // Bottom half
+          newSnapPosition = currentFabCenter.x < centerX ? 'bottom-left' : 'bottom-right';
+      }
+
+      setSnapPosition(newSnapPosition); // This will trigger the useEffect to reset position and save
+  };
+
+
+  // --- Navigation Logic ---
   const handleNavigation = (item: NavItem) => {
+    if (isDragging) return; // Don't navigate if just finished dragging
+
     if (item.isSheet) {
       setOpenSheet(item.id);
-      setIsNavOpen(false); // Close main nav when sheet opens
-    } else if (item.path && item.path !== pathname) { // Only navigate if path is different
-        router.push(item.path);
-        setIsNavOpen(false); // Close main nav on navigation
+      setIsNavOpen(false);
+    } else if (item.path && item.path !== pathname) {
+      router.push(item.path);
+      setIsNavOpen(false);
     } else {
-        // If clicking the active link or a non-navigational item without a sheet
-        setIsNavOpen(false);
+      setIsNavOpen(false);
     }
   };
 
-   const handleSheetOpenChange = (itemId: string, isOpen: boolean) => {
-       setOpenSheet(isOpen ? itemId : null);
-       // Don't automatically close the main nav circle here, sheet controls itself
-   };
+  const handleSheetOpenChange = (itemId: string, isOpen: boolean) => {
+    setOpenSheet(isOpen ? itemId : null);
+  };
 
-   const toggleNav = () => {
-       setIsNavOpen(!isNavOpen);
-       setOpenSheet(null); // Close any open sheet when toggling main nav
-   }
+  const toggleNav = () => {
+      // Prevent toggle if dragging starts on the button itself
+     if (!isDragging) {
+        setIsNavOpen(!isNavOpen);
+        setOpenSheet(null);
+     }
+  };
 
-   const currentPositionStyles = positionStyles[navPosition];
+  const currentSnapStyles = snapPositionStyles[snapPosition];
+
+
+  // Calculate menu position based on FAB position and snap corner
+  const getMenuPositionStyle = () => {
+      const style: React.CSSProperties = {
+          position: 'fixed',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: `${MENU_GAP}px`,
+          transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
+          zIndex: 50,
+      };
+
+      if (!isNavOpen) {
+          style.opacity = 0;
+          style.transform = 'scale(0.95) translateY(10px)';
+          style.pointerEvents = 'none';
+      } else {
+          style.opacity = 1;
+          style.transform = 'scale(1) translateY(0)';
+          style.pointerEvents = 'auto';
+      }
+
+      const fabCenterY = fabPosition.top + FAB_SIZE / 2;
+      const fabCenterX = fabPosition.left + FAB_SIZE / 2;
+      const menuHeight = navItems.length * MENU_ITEM_SIZE + (navItems.length -1) * MENU_GAP;
+
+      switch (snapPosition) {
+          case 'top-left':
+              style.top = `${fabPosition.top + FAB_SIZE + MENU_GAP}px`;
+              style.left = `${fabPosition.left}px`;
+              style.alignItems = 'flex-start';
+              style.transformOrigin = 'top left';
+              break;
+          case 'top-right':
+              style.top = `${fabPosition.top + FAB_SIZE + MENU_GAP}px`;
+              style.left = `${fabPosition.left + FAB_SIZE - MENU_ITEM_SIZE}px`; // Align right edges
+              style.alignItems = 'flex-end';
+               style.transformOrigin = 'top right';
+              break;
+          case 'bottom-left':
+              style.top = `${fabPosition.top - menuHeight - MENU_GAP}px`;
+              style.left = `${fabPosition.left}px`;
+              style.alignItems = 'flex-start';
+               style.transformOrigin = 'bottom left';
+              break;
+          case 'bottom-right':
+          default:
+              style.top = `${fabPosition.top - menuHeight - MENU_GAP}px`;
+              style.left = `${fabPosition.left + FAB_SIZE - MENU_ITEM_SIZE}px`; // Align right edges
+              style.alignItems = 'flex-end';
+               style.transformOrigin = 'bottom right';
+              break;
+      }
+
+        if (!isNavOpen) {
+            style.transform = snapPosition.includes('bottom')
+                ? 'scale(0.95) translateY(10px)'
+                : 'scale(0.95) translateY(-10px)'; // Adjust animation direction
+        } else {
+             style.transform = 'scale(1) translateY(0)';
+        }
+
+
+      return style;
+  };
 
   return (
     <TooltipProvider delayDuration={100}>
-        {/* Floating Action Button (FAB) Container - Position is controlled here */}
-        <div className={cn(
-            "fixed z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms]",
-            currentPositionStyles.fab
-        )}>
+        {/* FAB Container - Position is controlled by state */}
+        <div
+            ref={fabRef}
+            className={cn(
+                "fixed z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms] rounded-full cursor-grab transition-all duration-300 ease-out", // Added transition for snap back
+                isDragging && "scale-110 shadow-2xl", // Scale up and shadow during drag
+                 // Hide until mounted and position is calculated
+                !hasMounted && "opacity-0"
+            )}
+            style={{
+                top: `${fabPosition.top}px`,
+                left: `${fabPosition.left}px`,
+                touchAction: 'none', // Prevent scrolling while dragging on touch
+            }}
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+        >
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
                         size="icon"
                         className={cn(
-                            "rounded-full w-14 h-14 shadow-lg retro-glow transition-all duration-300 ease-out", // Added transition-all
-                            isNavOpen ? "scale-110 bg-primary/80 rotate-90" : "hover:scale-110 active:scale-100 rotate-0" // Rotate icon on open
+                            "rounded-full w-14 h-14 shadow-lg retro-glow transition-all duration-300 ease-out",
+                            isNavOpen ? "scale-110 bg-primary/80 rotate-90" : "hover:scale-110 active:scale-100 rotate-0"
                         )}
-                        // onClick={toggleNav} // Use handleFabClick for demo cycle logic
-                        onClick={handleFabClick}
+                        onClick={toggleNav}
                         aria-label={isNavOpen ? "Close Navigation" : "Open Navigation"}
                         aria-expanded={isNavOpen}
+                        // Prevent drag start from triggering click
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                     >
-                        {isNavOpen ? <CloseIcon className="h-6 w-6 transition-transform duration-300" /> : <Home className="h-6 w-6 transition-transform duration-300" />}
+                         {isDragging ? <Move className="h-6 w-6 animate-pulse" /> : (isNavOpen ? <CloseIcon className="h-6 w-6 transition-transform duration-300" /> : <Home className="h-6 w-6 transition-transform duration-300" />)}
                     </Button>
                 </TooltipTrigger>
-                {/* Adjust tooltip side based on position */}
-                <TooltipContent side={currentPositionStyles.tooltipSide}>{isNavOpen ? "Close" : "Menu"}</TooltipContent>
+                <TooltipContent side={currentSnapStyles.tooltipSide}>{isNavOpen ? "Close" : "Menu"}</TooltipContent>
             </Tooltip>
         </div>
 
-        {/* Navigation Items Container - Position is controlled here */}
-        {/* Adjust transform-origin based on position */}
+        {/* Navigation Items Container - Dynamically positioned */}
         <div
-            className={cn(
-                "fixed z-50 flex flex-col gap-3 transition-all duration-300 ease-out",
-                currentPositionStyles.menu, // Apply position classes
-                isNavOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95 pointer-events-none", // Adjusted animation
-                navPosition.includes('bottom') ? (navPosition.includes('left') ? 'origin-bottom-left' : 'origin-bottom-right') : '',
-                navPosition.includes('top') ? (navPosition.includes('left') ? 'origin-top-left' : 'origin-top-right') : ''
-            )}
-            aria-hidden={!isNavOpen} // Hide from screen readers when closed
+            style={getMenuPositionStyle()}
+            aria-hidden={!isNavOpen}
         >
             {navItems.map((item, index) => {
             const isActive = !item.isSheet && pathname === item.path;
+            const buttonContent = <item.icon className="h-5 w-5" />;
 
-            const buttonContent = (
-                <item.icon className={cn(
-                    "h-5 w-5", // Slightly smaller icon
-                )} />
+            const commonButtonClasses = cn(
+                "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out",
+                `delay-${index * 50}`, // Stagger animation (consider removing if menu animation is sufficient)
+                 isNavOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90', // Individual item animation within menu
             );
 
             if (item.isSheet) {
-                // Dynamically create the SheetContent component with props
                 const SheetContentComponent = item.sheetContent;
                 return (
                 <Sheet key={item.id} open={openSheet === item.id} onOpenChange={(isOpen) => handleSheetOpenChange(item.id, isOpen)}>
@@ -240,22 +424,20 @@ export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }:
                         <TooltipTrigger asChild>
                             <SheetTrigger asChild>
                                 <Button
-                                    variant="secondary" // Use secondary for contrast
+                                    variant="secondary"
                                     size="icon"
                                     className={cn(
-                                        "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out",
-                                         `delay-${index * 50}`, // Stagger animation
+                                        commonButtonClasses,
                                         openSheet === item.id ? 'scale-105 bg-primary/10 text-primary' : 'hover:scale-105 active:scale-100'
                                     )}
                                     aria-label={`Open ${item.label} sheet`}
-                                    onClick={() => handleNavigation(item)} // Ensure sheet opens via nav logic
+                                    onClick={() => handleNavigation(item)}
                                 >
                                     {buttonContent}
                                 </Button>
                             </SheetTrigger>
                         </TooltipTrigger>
-                         {/* Adjust tooltip side based on position */}
-                        <TooltipContent side={currentPositionStyles.tooltipSide} className="bg-secondary text-secondary-foreground">
+                        <TooltipContent side={currentSnapStyles.tooltipSide} className="bg-secondary text-secondary-foreground">
                             {item.label}
                         </TooltipContent>
                     </Tooltip>
@@ -264,13 +446,7 @@ export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }:
                             <SheetTitle className="text-center text-lg">{item.sheetTitle}</SheetTitle>
                         </SheetHeader>
                         <div className="flex-1 overflow-y-auto pt-2 pb-4">
-                             {/* Pass potential props needed by sheet content */}
-                             {/* Ensure sheetProps includes setNavPosition if SettingsContent needs it directly */}
-                            <SheetContentComponent
-                                {...item.sheetProps}
-                                // SettingsContent now receives setNavPosition and currentNavPosition via its props defined in the navItems array
-                                // No need to explicitly pass them here again unless they weren't in sheetProps
-                            />
+                            <SheetContentComponent {...item.sheetProps} />
                         </div>
                     </SheetContent>
                 </Sheet>
@@ -282,11 +458,10 @@ export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }:
                 <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                     <Button
-                        variant={isActive ? "default" : "secondary"} // Default for active, secondary otherwise
+                        variant={isActive ? "default" : "secondary"}
                         size="icon"
                         className={cn(
-                            "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out",
-                             `delay-${index * 50}`, // Stagger animation
+                            commonButtonClasses,
                             isActive ? 'scale-105 ring-2 ring-primary ring-offset-2 ring-offset-background' : 'hover:scale-105 active:scale-100'
                         )}
                         onClick={() => handleNavigation(item)}
@@ -295,8 +470,7 @@ export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }:
                         {buttonContent}
                     </Button>
                 </TooltipTrigger>
-                 {/* Adjust tooltip side based on position */}
-                 <TooltipContent side={currentPositionStyles.tooltipSide} className={cn(isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
+                <TooltipContent side={currentSnapStyles.tooltipSide} className={cn(isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
                     {item.label}
                 </TooltipContent>
                 </Tooltip>
@@ -307,19 +481,4 @@ export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }:
   );
 }
 
-// Helper function to generate Tailwind delay classes (optional, can inline)
-function generateDelayClasses() {
-  const delays = [0, 50, 75, 100, 150, 200, 300, 500];
-  return delays.map(d => `delay-${d}`).join(' ');
-}
-// You might need to configure Tailwind Safelist if you generate classes dynamically like this:
-// tailwind.config.js
-// module.exports = {
-//   safelist: [
-//     {
-//       pattern: /delay-\d+/,
-//     },
-//   ],
-//   // ... rest of config
-// };
-
+    
