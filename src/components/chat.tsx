@@ -245,7 +245,7 @@ export function Chat({
            return;
        }
        if (selectedFriends.length > 1 && !groupName.trim()) {
-           toast({ variant: "destructive", title: "Group Name Required" });
+           toast({ variant: "destructive", title: "Group Name Required", description: "Please enter a name for the group chat." });
            return;
        }
 
@@ -259,11 +259,11 @@ export function Chat({
        let newChat: ChatRoom;
        if (isGroup) {
             newChat = {
-                id: `group-${Date.now()}`, // Simple unique ID
+                id: `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`, // More unique ID for groups
                 name: groupName.trim(),
                 type: 'group',
                 participants: participantIds,
-                avatar: `https://picsum.photos/seed/${groupName.trim()}/40/40` // Placeholder avatar based on name
+                avatar: `https://picsum.photos/seed/${encodeURIComponent(groupName.trim())}/40/40` // Placeholder avatar based on name
             };
             toast({ title: "Group Chat Created", description: `Started group: ${newChat.name}` });
        } else {
@@ -310,13 +310,17 @@ export function Chat({
        name: 'Loading...',
        avatar: undefined, // Pass undefined instead of empty string
        fallback: 'L',
-       isOnline: false
+       isOnline: false,
+       isGroup: false,
+       participantCount: 0,
    } : {
        name: currentChat.name,
        avatar: currentChat.avatar || undefined, // Ensure undefined if no avatar
-       fallback: currentChat.name.charAt(0).toUpperCase(),
+       fallback: currentChat.type === 'group' ? '#' : currentChat.name.charAt(0).toUpperCase(),
        // Basic online status simulation (only for DMs for now)
-       isOnline: currentChat.type === 'dm' && friends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online'
+       isOnline: currentChat.type === 'dm' && friends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online',
+       isGroup: currentChat.type === 'group',
+       participantCount: currentChat.participants.length,
    };
 
 
@@ -332,12 +336,12 @@ export function Chat({
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring" disabled={!currentChat}>
                     <div className="relative">
-                        <Avatar className={cn("h-8 w-8 border-2", currentChatDisplay.isOnline ? "border-green-500/70" : "border-border/50")}>
+                        <Avatar className={cn("h-8 w-8 border-2", currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' ? "border-green-500/70" : "border-border/50")}>
                              {/* Pass undefined or a valid URL to src */}
                             <AvatarImage src={currentChatDisplay.avatar} alt={currentChatDisplay.name} />
                             <AvatarFallback>{currentChatDisplay.fallback}</AvatarFallback>
                         </Avatar>
-                         {currentChatDisplay.isOnline && (
+                         {currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' && (
                             <span className="absolute bottom-[-2px] right-[-2px] block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"></span>
                          )}
                     </div>
@@ -362,7 +366,9 @@ export function Chat({
                             )}
                           >
                             {room.type === 'group' ? (
-                                <Hash className="h-4 w-4 text-muted-foreground" />
+                                <Avatar className="h-5 w-5 bg-muted text-muted-foreground flex items-center justify-center rounded-sm">
+                                    <Hash className="h-3 w-3" />
+                                </Avatar>
                             ) : (
                                 <Avatar className="h-5 w-5">
                                     {/* Pass undefined or valid URL */}
@@ -491,11 +497,11 @@ export function Chat({
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" aria-label="View Chat Members" className="text-muted-foreground hover:text-foreground" disabled={!currentChat || isLoading}>
-                                {currentChat?.type === 'group' ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                                {currentChatDisplay.isGroup ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            {currentChat?.type === 'group' ? `View Members (${currentChat.participants.length})` : `View Profile`}
+                            {currentChatDisplay.isGroup ? `View Members (${currentChatDisplay.participantCount})` : `View Profile`}
                         </TooltipContent>
                     </Tooltip>
                 </div>
@@ -510,9 +516,9 @@ export function Chat({
 
       {/* Chat Messages Area */}
       <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea className="h-full" ref={scrollAreaRef}>
+        <ScrollArea className="h-full p-4" ref={scrollAreaRef}> {/* Added padding here */}
           <div ref={viewportRef} className="h-full"> {/* Viewport takes full height */}
-              <div className="p-4 space-y-4 pb-4">
+              <div className="space-y-4 pb-4"> {/* Removed padding here */}
                 {isLoading ? (
                     // Loading Skeletons
                     <>

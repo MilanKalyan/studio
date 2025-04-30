@@ -137,6 +137,10 @@ export default function Home() {
                 }
                 return [...prev, newChatDetails];
             });
+            // Add empty messages array for new chat
+            if (!placeholderMessages[newChatDetails.id]) {
+                placeholderMessages[newChatDetails.id] = [];
+            }
             toast({ title: "Chat Created", description: `Started chat with ${newChatDetails.name}` });
         } else if (!targetChat) {
             toast({ variant: "destructive", title: "Chat Not Found" });
@@ -194,6 +198,10 @@ export default function Home() {
                 handleSwitchChat(newRoom.id); // Just switch to it
                 return prev;
             }
+             // Add empty message array for the new room in placeholder data
+             if (!placeholderMessages[newRoom.id]) {
+                placeholderMessages[newRoom.id] = [];
+            }
             return [...prev, newRoom];
         });
         handleSwitchChat(newRoom.id); // Switch to the newly created room
@@ -220,7 +228,7 @@ export default function Home() {
    // Render main app layout
    return (
      <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-muted/10">
-       <main className="flex-1 p-2 md:p-4 overflow-hidden relative pb-20"> {/* Keep padding-bottom */}
+       <main className="flex-1 p-2 md:p-4 overflow-hidden relative"> {/* Removed padding-bottom */}
          {/* Pass chat state and handlers to AppLayout */}
          <AppLayout
              chatRooms={chatRooms}
@@ -231,7 +239,7 @@ export default function Home() {
              currentUserId={currentUserId}
              onSwitchChat={handleSwitchChat}
              onAddMessage={addMessage}
-             onAddChatRoom={addChatRoom}
+             onAddChatRoom={addChatRoom} // Pass the handler here
           />
        </main>
        {/* Pass necessary props to BottomNavigation */}
@@ -239,6 +247,7 @@ export default function Home() {
             onLogout={handleLogout}
             chatRooms={chatRooms} // Pass chatRooms for MySpace
             onSwitchChat={handleSwitchChat} // Pass switch function for MySpace
+            // initialSnapPosition="top-right" // Example: Set initial position
        />
      </div>
    );
