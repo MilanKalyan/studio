@@ -630,7 +630,7 @@ export function Chat({
 
                 <Input
                     type="text"
-                    placeholder={currentChat ? "Type a message..." : "Select a chat"}
+                    placeholder={currentChat && currentChat.id !== 'loading' ? "Type a message..." : "Select a chat"}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     className="flex-1 bg-muted/50 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200"
