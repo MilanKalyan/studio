@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SendHorizonal, Users, MessageSquare } from 'lucide-react';
+import { format } from 'date-fns'; // Import format from date-fns
 
 interface Message {
   id: string;
@@ -20,7 +21,7 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', sender: 'Alice', text: 'Hey Bob!', timestamp: Date.now() - 60000, avatar: 'https://picsum.photos/seed/alice/40/40' },
     { id: '2', sender: 'Bob', text: 'Hi Alice! What\'s up?', timestamp: Date.now() - 30000, avatar: 'https://picsum.photos/seed/bob/40/40' },
-    { id: '3', sender: 'Alice', text: 'Not much, just checking out NexusPlay. Wanna play Tic Tac Toe?', timestamp: Date.now(), avatar: 'https://picsum.photos/seed/alice/40/40' },
+    { id: '3', sender: 'Alice', text: 'Not much, just checking out Kinect. Wanna play Tic Tac Toe?', timestamp: Date.now(), avatar: 'https://picsum.photos/seed/alice/40/40' },
   ]);
   const [newMessage, setNewMessage] = useState('');
   const currentUser = 'Bob'; // Assume current user is Bob for display logic
@@ -79,7 +80,8 @@ export function Chat() {
                   {msg.sender !== currentUser && <p className="font-semibold text-xs mb-1 opacity-80">{msg.sender}</p>}
                   <p>{msg.text}</p>
                   <p className="text-xs opacity-60 mt-1 text-right">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {/* Use date-fns format for consistent time formatting */}
+                    {format(new Date(msg.timestamp), 'p')}
                   </p>
                 </div>
                  {msg.sender === currentUser && (
