@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Import useEffect
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gamepad2, Users, Play } from 'lucide-react';
 import { GameRecommender } from './game-recommender'; // Assuming GameRecommender exists
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 // Placeholder Game type
 interface Game {
@@ -23,6 +24,13 @@ const availableGames: Game[] = [
 
 export function GameLobby() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [isClient, setIsClient] = useState(false); // State to track client-side mount
+
+  useEffect(() => {
+    // Set isClient to true after component mounts
+    setIsClient(true);
+  }, []);
+
 
   const handleStartGame = (game: Game) => {
     // Placeholder for starting/joining a game session
@@ -37,44 +45,66 @@ export function GameLobby() {
           <Gamepad2 className="h-6 w-6 text-primary" />
           <CardTitle className="text-lg font-semibold">Game Lobby</CardTitle>
          </div>
-          <Button variant="ghost" size="icon">
-            <Users className="h-5 w-5" />
-            <span className="sr-only">Find Players</span>
-        </Button>
+         {/* Only render button on client to prevent hydration mismatch */}
+         {isClient ? (
+             <Button variant="ghost" size="icon">
+                <Users className="h-5 w-5" />
+                <span className="sr-only">Find Players</span>
+            </Button>
+         ) : (
+            <Skeleton className="h-10 w-10 rounded-md" />
+         )}
       </CardHeader>
       <CardContent className="p-4 space-y-6">
-        <div>
-            <h3 className="text-md font-semibold mb-3 text-accent">Available Games</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {availableGames.map((game) => (
-                <Card
-                key={game.id}
-                className={`p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
-                    selectedGame?.id === game.id ? 'ring-2 ring-accent scale-105 bg-card/90' : 'hover:bg-muted/50 hover:scale-102'
-                }`}
-                onClick={() => setSelectedGame(game)}
-                >
-                <div className="mb-2 text-accent">{game.icon}</div>
-                <h4 className="font-medium text-sm">{game.name}</h4>
-                <p className="text-xs text-muted-foreground mt-1">{game.description}</p>
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3 retro-glow"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent card click when clicking button
-                      handleStartGame(game);
-                    }}
-                >
-                    <Play className="mr-1 h-4 w-4" /> Play
-                </Button>
-                </Card>
-            ))}
-            </div>
-        </div>
-
-        <GameRecommender />
-
+         {/* Only render content on client to prevent hydration mismatch */}
+         {isClient ? (
+            <>
+                <div>
+                    <h3 className="text-md font-semibold mb-3 text-accent">Available Games</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {availableGames.map((game) => (
+                        <Card
+                        key={game.id}
+                        className={`p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+                            selectedGame?.id === game.id ? 'ring-2 ring-accent scale-105 bg-card/90' : 'hover:bg-muted/50 hover:scale-102'
+                        }`}
+                        onClick={() => setSelectedGame(game)}
+                        >
+                        <div className="mb-2 text-accent">{game.icon}</div>
+                        <h4 className="font-medium text-sm">{game.name}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">{game.description}</p>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-3 retro-glow"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent card click when clicking button
+                              handleStartGame(game);
+                            }}
+                        >
+                            <Play className="mr-1 h-4 w-4" /> Play
+                        </Button>
+                        </Card>
+                    ))}
+                    </div>
+                </div>
+                <GameRecommender />
+            </>
+         ) : (
+             <div className="space-y-6">
+                {/* Skeleton for Available Games */}
+                <div>
+                    <Skeleton className="h-6 w-32 mb-3" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[...Array(3)].map((_, i) => (
+                            <Skeleton key={i} className="h-36 rounded-lg" />
+                        ))}
+                    </div>
+                </div>
+                {/* Skeleton for Game Recommender */}
+                <Skeleton className="h-48 rounded-lg" />
+             </div>
+         )}
       </CardContent>
     </Card>
   );

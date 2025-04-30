@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SendHorizonal, Users, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns'; // Import format from date-fns
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 interface Message {
   id: string;
@@ -73,10 +74,15 @@ export function Chat() {
           <MessageSquare className="h-6 w-6 text-secondary" />
           <CardTitle className="text-lg font-semibold">Global Chat</CardTitle>
         </div>
-        <Button variant="ghost" size="icon">
-          <Users className="h-5 w-5" />
-          <span className="sr-only">View Users</span>
-        </Button>
+         {/* Only render button on client to prevent hydration mismatch */}
+         {isClient ? (
+            <Button variant="ghost" size="icon">
+                <Users className="h-5 w-5" />
+                <span className="sr-only">View Users</span>
+            </Button>
+         ) : (
+            <Skeleton className="h-10 w-10 rounded-md" />
+         )}
       </CardHeader>
       <CardContent className="flex-1 p-0 overflow-hidden">
         {/* Pass the ref to the ScrollArea component */}
@@ -121,20 +127,28 @@ export function Chat() {
         </ScrollArea>
       </CardContent>
       <CardFooter className="p-4 border-t border-border">
-        <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          <Input
-            type="text"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 bg-background/80 focus:ring-accent focus:border-accent"
-            aria-label="Chat message input"
-          />
-          <Button type="submit" size="icon" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground retro-glow">
-            <SendHorizonal className="h-5 w-5" />
-            <span className="sr-only">Send message</span>
-          </Button>
-        </form>
+         {/* Only render form on client to prevent hydration mismatch */}
+         {isClient ? (
+            <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
+                <Input
+                    type="text"
+                    placeholder="Type a message..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    className="flex-1 bg-background/80 focus:ring-accent focus:border-accent"
+                    aria-label="Chat message input"
+                />
+                <Button type="submit" size="icon" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground retro-glow">
+                    <SendHorizonal className="h-5 w-5" />
+                    <span className="sr-only">Send message</span>
+                </Button>
+            </form>
+         ) : (
+            <div className="flex w-full items-center space-x-2">
+                <Skeleton className="h-10 flex-1" />
+                <Skeleton className="h-10 w-10" />
+            </div>
+         )}
       </CardFooter>
     </Card>
   );
