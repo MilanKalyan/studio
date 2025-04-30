@@ -66,9 +66,12 @@ export default function Home() {
 
   // Render main app layout if authenticated
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10"> {/* Use h-screen for full height */}
-       {/* Main Content Area - Adjusted pb-14 to match the height of BottomNavigation (h-14). Added overflow-hidden */}
-       <main className="flex-1 p-2 md:p-4 pb-14 overflow-hidden"> {/* Add overflow-hidden to main */}
+    // Use h-screen and flex-col for full height layout that includes the bottom nav
+    <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10">
+       {/* Main Content Area - flex-1 allows it to grow, pb-16 provides space for the nav */}
+       {/* overflow-hidden ensures content doesn't spill out */}
+       <main className="flex-1 p-2 md:p-4 pb-16 overflow-hidden">
+         {/* Card takes full height within the main area */}
          <Card className="h-full w-full shadow-xl border-primary/10 overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-0">
              {/* Chat Area - Takes full height within Card */}
              <div className="lg:col-span-2 h-full overflow-hidden border-r border-border/50">
@@ -81,8 +84,7 @@ export default function Home() {
          </Card>
        </main>
 
-       {/* Bottom Navigation */}
-       {/* Pass handleLogout to BottomNavigation -> SettingsContent */}
+       {/* Bottom Navigation - Fixed at the bottom */}
        <BottomNavigation onLogout={handleLogout} />
     </div>
   );

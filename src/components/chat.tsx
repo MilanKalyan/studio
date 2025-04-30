@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SendHorizonal, Users, Paperclip, ImageIcon, Bot, Smile, Loader2, MessageSquare } from 'lucide-react'; // Added Loader2 and MessageSquare
+import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare } from 'lucide-react'; // Added Loader2 and MessageSquare
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -77,12 +77,21 @@ export function Chat() {
       });
   }, []);
 
-   // Scroll smoothly when new messages are added by the current user
+   // Scroll smoothly when new messages are added by the current user or when messages load initially
    useEffect(() => {
-       if (messages.length > 0 && messages[messages.length - 1]?.sender === currentUser) {
-           scrollToBottom('smooth');
+       if (!isLoading && messages.length > 0) {
+            // If the last message is from the current user, scroll smoothly
+           if (messages[messages.length - 1]?.sender === currentUser) {
+               scrollToBottom('smooth');
+           } else {
+               // For received messages or initial load, check if user is near the bottom before auto-scrolling
+               const viewport = viewportRef.current;
+               if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) { // Check if near bottom (e.g., within 150px)
+                 scrollToBottom('smooth');
+               }
+           }
        }
-   }, [messages, currentUser, scrollToBottom]);
+   }, [messages, currentUser, scrollToBottom, isLoading]);
 
 
   // --- Message Sending Logic ---
@@ -128,11 +137,11 @@ export function Chat() {
              avatar: 'https://picsum.photos/seed/alice/40/40',
          };
          setMessages(prevMessages => [...prevMessages, replyMessage]);
-         // Consider scrolling only if user is near the bottom when receiving messages
-         // const viewport = viewportRef.current;
-         // if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100) {
-         //    scrollToBottom('smooth');
-         // }
+         // Check if user is near the bottom before scrolling for received messages
+         const viewport = viewportRef.current;
+         if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
+            scrollToBottom('smooth');
+         }
      }, 1500);
 
   };
@@ -175,9 +184,10 @@ export function Chat() {
          {/* ScrollArea takes full height of the CardContent */}
         <ScrollArea className="h-full" ref={scrollAreaRef}>
           {/* Viewport needs a direct ref */}
-          <div className="h-full" ref={viewportRef}>
-             {/* Inner container for padding and messages - Removed pb-10 */}
-              <div className="p-4 space-y-4"> {/* Removed pb-10 */}
+          {/* Removed h-full from viewport, ScrollArea handles height */}
+          <div ref={viewportRef}>
+             {/* Inner container for padding and messages - Added pb-4 for spacing above input */}
+              <div className="p-4 space-y-4 pb-4">
                 {isLoading ? (
                     // Loading Skeletons
                     <>
@@ -187,11 +197,12 @@ export function Chat() {
                                <div className={cn("flex flex-col gap-1.5", i % 2 === 0 ? 'items-start' : 'items-end')}>
                                    <Skeleton className={cn("h-4 w-20", i % 2 !== 0 && 'hidden')} /> {/* Sender name */}
                                    <Skeleton className={cn("h-10 rounded-lg", i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-32' : 'w-40')} />
+                                   {/* Skeleton for timestamp - ensure it renders without causing nesting issues */}
                                    <span className={cn(
-                                       "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for skeleton
-                                        'opacity-0' // Hide timestamp skeleton initially
+                                       "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]",
+                                       'opacity-0' // Hide timestamp skeleton initially
                                    )}>
-                                     <Skeleton className="h-3 w-10 inline-block" /> {/* Timestamp - use inline-block for proper skeleton display */}
+                                     <Skeleton className="h-3 w-10 inline-block" /> {/* Timestamp */}
                                    </span>
                                </div>
                                {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
@@ -246,7 +257,7 @@ export function Chat() {
                                 isCurrentUser
                                   ? 'bg-primary text-primary-foreground rounded-br-none animate-in slide-in-from-right-4 duration-300 ease-out'
                                   : 'bg-muted text-foreground rounded-bl-none animate-in slide-in-from-left-4 duration-300 ease-out',
-                                showAvatar ? 'mt-1' : '' // Add slight margin top if avatar is not shown
+                                !showAvatar ? 'mt-1' : '' // Add slight margin top if avatar is not shown
                               )}
                             >
                                 {/* Sender Name (only if showing avatar and not current user) */}
@@ -255,13 +266,15 @@ export function Chat() {
                                 <p className="leading-snug break-words">{msg.text}</p> {/* Improved line height, ensure word breaks */}
 
                                 {/* Timestamp (conditionally displayed, aligned right within bubble) */}
-                                <span className={cn(
-                                    "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for layout stability
-                                    showTimestamp ? 'opacity-60' : 'opacity-0' // Hide if not last message of group
-                                )}>
-                                   {/* Render only on client to avoid hydration issues */}
-                                   {isClient ? format(new Date(msg.timestamp), 'p') : ''}
-                                </span>
+                                {/* Render only on client to avoid hydration issues */}
+                                {isClient && (
+                                    <span className={cn(
+                                        "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for layout stability
+                                        showTimestamp ? 'opacity-60' : 'opacity-0' // Hide if not last message of group
+                                    )}>
+                                       {format(new Date(msg.timestamp), 'p')}
+                                    </span>
+                                )}
                             </div>
 
                          </div>
@@ -274,7 +287,7 @@ export function Chat() {
       </CardContent>
 
       {/* Chat Input Bar */}
-      {/* Use flex-shrink-0 to prevent it from shrinking. Remove sticky positioning. */}
+      {/* Use flex-shrink-0 to prevent it from shrinking. */}
       <div className="p-2 sm:p-4 border-t border-border bg-background flex-shrink-0">
          {isClient ? (
            <TooltipProvider delayDuration={200}>
