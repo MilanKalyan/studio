@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Import Inter
+import { GeistSans } from 'geist/font/sans'; // Correct import for Geist Sans
+import { GeistMono } from 'geist/font/mono'; // Correct import for Geist Mono
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
+import { BottomNavigation } from '@/components/bottom-navigation'; // Import BottomNavigation
 
-// Define font variables using Inter
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' }); // Configure Inter font
+// Define font variables
+const fontSansVariable = GeistSans.variable;
+const fontMonoVariable = GeistMono.variable;
 
 export const metadata: Metadata = {
   title: 'Kinect', // Updated title
@@ -18,16 +21,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // Apply dark theme by default to the html tag
-    <html lang="en" className={`${inter.variable} dark`}>
+    <html lang="en" className={cn("dark", fontSansVariable, fontMonoVariable)}>
       <body
         className={cn(
-          // Use font-sans defined by the variable above
-          'antialiased font-sans transition-colors duration-300' // Add transition
+          'antialiased font-sans transition-colors duration-300 flex flex-col min-h-screen' // Ensure body takes full height and uses flex column
         )}
       >
-        {children}
-        <Toaster /> {/* Add Toaster component */}
+        <main className="flex-1 overflow-y-auto">{children}</main> {/* Main content area */}
+        <BottomNavigation /> {/* Add BottomNavigation */}
+        <Toaster />
       </body>
     </html>
   );
