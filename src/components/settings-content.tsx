@@ -7,29 +7,29 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
-import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy, Loader2, Move } from "lucide-react"; // Added Loader2 and Move
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy, Loader2, Move } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react"; // Import useState and useEffect
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
-import { cn } from "@/lib/utils"; // Import cn
+import { useState, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
-// Define position type, should match the one in bottom-navigation.tsx
+// Define position type, must match the one in bottom-navigation.tsx
 type NavPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 interface SettingsContentProps {
-    onLogout: () => void; // Define the prop type
-    setNavPosition: (position: NavPosition) => void; // Callback to change nav position
-    currentNavPosition: NavPosition; // Current position to set default value
+    onLogout: () => void;
+    setNavPosition: (position: NavPosition) => void; // Callback to change nav position in the parent
+    currentNavPosition: NavPosition; // Current position to set default value of RadioGroup
 }
 
 
-export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }: SettingsContentProps) { // Accept props
+export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }: SettingsContentProps) {
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isClient, setIsClient] = useState(false); // State for client-side rendering check
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true); // Component has mounted on the client
@@ -55,11 +55,13 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
    useEffect(() => {
        if (isClient) { // Only run fetch simulation on client
             const timer = setTimeout(() => {
+                 // Generate a unique Kinect ID on client mount for demo purposes
+                 const randomIdPart = Math.floor(1000 + Math.random() * 9000);
                  setUser({
                      name: "Bob The Builder",
                      email: "bob@example.com",
                      avatar: "https://picsum.photos/seed/bob/100/100",
-                     kinectId: `KINECT#${Math.floor(1000 + Math.random() * 9000)}`
+                     kinectId: `KINECT#${randomIdPart}` // Assign generated ID
                  });
             }, 1000); // Simulate 1 second delay
             return () => clearTimeout(timer);
@@ -68,8 +70,8 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
 
 
   const copyKinectId = () => {
-    if (!navigator.clipboard) {
-        toast({ variant: "destructive", title: "Clipboard Error", description: "Clipboard API not available." });
+    if (!navigator.clipboard || !isClient || user.kinectId === "KINECT#...") {
+        toast({ variant: "destructive", title: "Cannot Copy", description: "Clipboard API not available or ID not loaded." });
         return;
     }
     navigator.clipboard.writeText(user.kinectId).then(() => {
@@ -112,11 +114,12 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
              } else {
                  document.documentElement.classList.add(value);
              }
+             localStorage.setItem('theme', value); // Save theme preference
          }
         toast({ title: "Theme Updated", description: `Theme set to ${value}.`, duration: 2000 });
     };
 
-    // Handle navigation position change
+    // Handle navigation position change using the passed function
     const handleNavPositionChange = (value: NavPosition) => {
         setNavPosition(value); // Call the callback passed from props
         // Optionally save this preference (e.g., in localStorage)
@@ -147,7 +150,7 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                         <div className="flex items-center gap-1 mt-1">
                             <p className="text-xs font-mono text-secondary truncate">{user.kinectId}</p>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-secondary flex-shrink-0" onClick={copyKinectId} aria-label="Copy Kinect ID">
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-secondary flex-shrink-0" onClick={copyKinectId} aria-label="Copy Kinect ID" disabled={user.kinectId === "KINECT#..."}>
                                 <Copy className="h-3 w-3" />
                             </Button>
                         </div>
@@ -250,22 +253,24 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
 
           {/* Navigation Position Control */}
           <div className="space-y-3">
-            <Label className="flex items-center gap-2"><Move className="h-4 w-4"/> Navigation Position</Label>
+            <Label className="flex items-center gap-2"><Move className="h-4 w-4"/> Navigation Menu Position</Label>
+             {/* Use currentNavPosition for defaultValue and onValueChange to update via prop */}
             <RadioGroup
-                defaultValue={currentNavPosition}
-                onValueChange={(value) => handleNavPositionChange(value as NavPosition)}
-                className="grid grid-cols-2 gap-4"
+                value={currentNavPosition} // Controlled component using the prop
+                onValueChange={(value) => handleNavPositionChange(value as NavPosition)} // Call the passed setter
+                className="grid grid-cols-2 gap-x-4 gap-y-2" // Adjusted gap
                 disabled={!isClient}
              >
               {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as NavPosition[]).map((pos) => (
                 <div key={pos} className="flex items-center space-x-2">
                   <RadioGroupItem value={pos} id={`nav-pos-${pos}`} />
-                  <Label htmlFor={`nav-pos-${pos}`} className="capitalize text-sm font-normal">
+                  <Label htmlFor={`nav-pos-${pos}`} className="capitalize text-sm font-normal cursor-pointer">
                     {pos.replace('-', ' ')}
                   </Label>
                 </div>
               ))}
             </RadioGroup>
+             <p className="text-xs text-muted-foreground">Tip: Rapidly click the menu button 5 times to cycle positions!</p>
           </div>
            {/* Add more appearance settings like font size, chat density etc. */}
         </CardContent>
