@@ -1,9 +1,10 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Folder, Star, Users, Clock, UserPlus, Search, Loader2 } from "lucide-react";
+import { Folder, Star, Users, Clock, UserPlus, Search, Loader2, Hash } from "lucide-react"; // Added Hash
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +12,7 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import type { ChatRoom } from './chat'; // Import ChatRoom type
 
 // Placeholder data - replace with actual user data fetching
 const placeholderRecentActivities = [
@@ -26,16 +28,32 @@ const placeholderFavoriteGames = [
     { id: 'checkers', name: 'Checkers', img: 'https://picsum.photos/seed/checkers/100/100' },
 ];
 
-const placeholderFriends = [
-     { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online'},
-     { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline'},
-     { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame'},
-     { id: 'eve', name: 'Eve', avatar: 'https://picsum.photos/seed/eve/40/40', status: 'online'},
-     { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline'},
+// Placeholder Player type definition (copied from chat.tsx)
+interface Player {
+    id: string;
+    name: string;
+    avatar: string;
+    status: 'online' | 'offline' | 'ingame';
+    kinectId: string;
+}
+
+// Placeholder friends data (copied from chat.tsx)
+const placeholderFriends: Player[] = [
+     { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online', kinectId: 'KINECT#1234'},
+     { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline', kinectId: 'KINECT#5678'},
+     { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame', kinectId: 'KINECT#9012'},
+     { id: 'eve', name: 'Eve', avatar: 'https://picsum.photos/seed/eve/40/40', status: 'online', kinectId: 'KINECT#3456'},
+     { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline', kinectId: 'KINECT#7890'},
 ];
 
+// Props for MySpaceContent
+interface MySpaceContentProps {
+    // Add props as needed, e.g., function to switch chat in the main Chat component
+    // onSwitchChat?: (chatId: string) => void;
+    // chatRooms?: ChatRoom[]; // Pass chat rooms list if needed here
+}
 
-export function MySpaceContent() {
+export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceContentProps) {
   const { toast } = useToast();
   const [friendIdInput, setFriendIdInput] = useState('');
   const [isAddingFriend, setIsAddingFriend] = useState(false);
@@ -62,51 +80,117 @@ export function MySpaceContent() {
 
    const handleAddFriend = async () => {
      const trimmedId = friendIdInput.trim();
-     if (trimmedId) {
-         setIsAddingFriend(true);
-         console.log(`Attempting to add friend with ID: ${trimmedId}`);
-         // Simulate API call
-         await new Promise(resolve => setTimeout(resolve, 1000));
-
-         // Simulate success/failure
-         const success = Math.random() > 0.3; // 70% success rate
-
-         if (success) {
-             toast({
-                 title: "Friend Request Sent",
-                 description: `Friend request sent to ${trimmedId}.`,
-                 duration: 3000,
-             });
-             setFriendIdInput(''); // Clear input on success
-         } else {
-             toast({
-                 variant: "destructive",
-                 title: "Friend Not Found",
-                 description: `Could not find a user with ID ${trimmedId}.`,
-                 duration: 4000,
-             });
-         }
-         setIsAddingFriend(false);
-     } else {
-         toast({
-             variant: "destructive",
-             title: "Invalid ID",
-             description: "Please enter a valid Kinect ID.",
-             duration: 3000,
-         });
+     if (!trimmedId) {
+         toast({ variant: "destructive", title: "Invalid ID" });
+         return;
      }
+
+     // Check if already friends
+     if (friends.some(f => f.kinectId === trimmedId)) {
+         toast({ variant: "destructive", title: "Already Friends", description: "You are already friends with this user." });
+         setFriendIdInput('');
+         return;
+     }
+     // Check if adding self
+      if (trimmedId === "KINECT#5555") { // Assuming current user ID is KINECT#5555
+          toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a friend." });
+          return;
+      }
+
+
+     setIsAddingFriend(true);
+     console.log(`Attempting to add friend with ID: ${trimmedId}`);
+     await new Promise(resolve => setTimeout(resolve, 1000));
+
+     // Simulate success/failure
+     const success = Math.random() > 0.3; // 70% success rate
+     const foundUser = placeholderFriends.find(p => p.kinectId === trimmedId); // Simulate finding user
+
+     if (success && foundUser) {
+         // Simulate adding friend locally (in real app, backend handles this)
+          setFriends(prev => [...prev, { ...foundUser, status: Math.random() > 0.5 ? 'online' : 'offline' }]); // Add found user with random status
+         toast({ title: "Friend Request Sent", description: `Friend request sent to ${foundUser.name} (${trimmedId}).` });
+         setFriendIdInput('');
+     } else {
+         toast({ variant: "destructive", title: "Friend Not Found", description: `Could not find a user with ID ${trimmedId}.` });
+     }
+     setIsAddingFriend(false);
    };
+
+    // Placeholder function to handle clicking on a chat
+    const handleChatClick = (chatId: string) => {
+        console.log("Clicked chat:", chatId);
+        // If onSwitchChat prop exists, call it
+        // onSwitchChat?.(chatId);
+        toast({ title: "Switching Chat (Placeholder)", description: `Would switch to chat ID: ${chatId}`, duration: 2000 });
+    };
+
 
   return (
     <div className="space-y-6 p-4 pb-10">
-      {/* Profile Summary (Could be enhanced) */}
-      <Card className={cn("animate-fade-in opacity-0 [--fade-in-delay:50ms]", isLoading && "opacity-100")}>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Your Space</CardTitle>
-          <CardDescription>Quick access to your favorites and activities.</CardDescription>
-        </CardHeader>
-         {/* Content removed, can be added back if needed */}
-      </Card>
+      {/* My Chats Section (New) */}
+       <Card className={cn("animate-fade-in opacity-0 [--fade-in-delay:100ms]", isLoading && "opacity-100")}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-md font-semibold flex items-center gap-2">
+                    <Hash className="h-5 w-5 text-primary" /> My Chats
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs h-7" disabled={isLoading}>See All</Button>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <div className="space-y-3">
+                        {[...Array(3)].map((_, i) => (
+                            <div key={`chat-skel-${i}`} className="flex items-center gap-3">
+                                <Skeleton className="h-8 w-8 rounded-full" />
+                                <div className="flex-1 space-y-1.5">
+                                     <Skeleton className="h-4 w-3/4" />
+                                     <Skeleton className="h-3 w-1/2" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                        {/* Placeholder for Chat List - map through actual chatRooms prop later */}
+                        {/* Example Items: */}
+                        <div className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleChatClick('global')}>
+                            <Avatar className="h-8 w-8">
+                                <AvatarImage src="https://picsum.photos/seed/group/40/40" alt="Global Chat" />
+                                <AvatarFallback>G</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">Global Chat</p>
+                                <p className="text-xs text-muted-foreground truncate">Perfect! I'll bring my A-game. ♟️</p>
+                            </div>
+                        </div>
+                         <div className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleChatClick('dm-alice-bob')}>
+                            <Avatar className="h-8 w-8">
+                                <AvatarImage src="https://picsum.photos/seed/alice/40/40" alt="Alice" />
+                                <AvatarFallback>A</AvatarFallback>
+                            </Avatar>
+                             <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">Alice</p>
+                                <p className="text-xs text-muted-foreground truncate">Awesome! See you then. 😄</p>
+                             </div>
+                        </div>
+                         <div className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleChatClick('group-chess-club')}>
+                            <Avatar className="h-8 w-8">
+                                <AvatarImage src="https://picsum.photos/seed/chessclub/40/40" alt="Chess Club" />
+                                <AvatarFallback>#</AvatarFallback>
+                            </Avatar>
+                             <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">Chess Club</p>
+                                <p className="text-xs text-muted-foreground truncate">Bob: Chess works! Let's do that.</p>
+                             </div>
+                        </div>
+                        {/* {chatRooms.length === 0 && !isLoading && ( // Check chatRooms prop later
+                           <p className="text-sm text-muted-foreground text-center py-4">No active chats.</p>
+                        )} */}
+                    </div>
+                )}
+            </CardContent>
+       </Card>
+
 
        {/* Favorite Games */}
       <Card className={cn("animate-fade-in opacity-0 [--fade-in-delay:150ms]", isLoading && "opacity-100")}>
@@ -128,7 +212,7 @@ export function MySpaceContent() {
                 </div>
             ) : (
                 <div className="grid grid-cols-3 gap-4">
-                     {favoriteGames.slice(0, 3).map(game => ( // Show only first 3 for brevity
+                     {favoriteGames.slice(0, 3).map(game => (
                         <div key={game.id} className="flex flex-col items-center text-center group cursor-pointer"
                              onClick={() => { /* Navigate to game or show details */ }}>
                              <Image
@@ -169,7 +253,7 @@ export function MySpaceContent() {
                 ))}
             </div>
           ) : (
-            <ul className="space-y-2 text-sm text-muted-foreground max-h-36 overflow-y-auto pr-1"> {/* Limit height */}
+            <ul className="space-y-2 text-sm text-muted-foreground max-h-36 overflow-y-auto pr-1">
                 {recentActivities.map((activity) => (
                 <li key={activity.id} className="flex justify-between items-center hover:bg-muted/50 px-1 -mx-1 rounded transition-colors">
                     <span className="truncate pr-2">{activity.name} <span className="text-xs opacity-70">({activity.type})</span></span>
@@ -188,7 +272,7 @@ export function MySpaceContent() {
       <Card className={cn("animate-fade-in opacity-0 [--fade-in-delay:350ms]", isLoading && "opacity-100")}>
          <CardHeader className="pb-2">
             <CardTitle className="text-md font-semibold flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-500" /> Friends
+                <Users className="h-5 w-5 text-green-500" /> Friends ({friends.length})
             </CardTitle>
              {/* Add Friend Input */}
              <form onSubmit={(e) => { e.preventDefault(); handleAddFriend(); }} className="flex items-center gap-2 mt-3">
@@ -201,7 +285,7 @@ export function MySpaceContent() {
                     aria-label="Enter Kinect ID to add friend"
                     disabled={isAddingFriend || isLoading}
                  />
-                <Button size="sm" type="submit" aria-label="Add Friend" disabled={isAddingFriend || !friendIdInput.trim() || isLoading} className="h-9 w-9 p-0">
+                <Button size="icon" type="submit" aria-label="Add Friend" disabled={isAddingFriend || !friendIdInput.trim() || isLoading} className="h-9 w-9 flex-shrink-0">
                     {isAddingFriend ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
                 </Button>
             </form>
@@ -226,11 +310,11 @@ export function MySpaceContent() {
                  ))}
                </div>
            ) : (
-            <div className="space-y-3 max-h-48 overflow-y-auto pr-1"> {/* Limit height */}
+            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                 {friends.map(friend => (
                     <div key={friend.id} className="flex items-center justify-between hover:bg-muted/50 px-1 -mx-1 rounded transition-colors cursor-pointer"
                          onClick={() => { /* Open chat or profile */ }}>
-                        <div className="flex items-center gap-2 min-w-0"> {/* Allow truncation */}
+                        <div className="flex items-center gap-2 min-w-0">
                             <div className="relative flex-shrink-0">
                                 <Avatar className="h-8 w-8">
                                     <AvatarImage src={friend.avatar} alt={friend.name} />

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare, PlusCircle, Search, UserCheck } from 'lucide-react'; // Added Loader2, MessageSquare, PlusCircle, Search, UserCheck
+import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare, PlusCircle, Search, UserCheck, Hash, User, ChevronsUpDown } from 'lucide-react'; // Added Hash, User, ChevronsUpDown
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -21,6 +21,15 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
@@ -34,22 +43,45 @@ interface Message {
   avatar: string;
 }
 
-// Placeholder Player type (copied from my-space-content for now)
+// Placeholder Player type
 interface Player {
     id: string;
     name: string;
     avatar: string;
     status: 'online' | 'offline' | 'ingame';
+    kinectId: string; // Added Kinect ID
 }
 
-// Placeholder friends data (copied from my-space-content for now)
+// Placeholder friends data
 const placeholderFriends: Player[] = [
-     { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online'},
-     { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline'},
-     { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame'},
-     { id: 'eve', name: 'Eve', avatar: 'https://picsum.photos/seed/eve/40/40', status: 'online'},
-     { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline'},
+     { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online', kinectId: 'KINECT#1234'},
+     { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline', kinectId: 'KINECT#5678'},
+     { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame', kinectId: 'KINECT#9012'},
+     { id: 'eve', name: 'Eve', avatar: 'https://picsum.photos/seed/eve/40/40', status: 'online', kinectId: 'KINECT#3456'},
+     { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline', kinectId: 'KINECT#7890'},
 ];
+
+// Placeholder Chat Room type
+export interface ChatRoom { // Exporting for use in MySpaceContent
+    id: string;
+    name: string;
+    type: 'group' | 'dm';
+    avatar?: string; // Optional: Group avatar or DM user avatar
+    participants: string[]; // List of participant IDs (e.g., ['bob', 'alice'])
+    lastMessage?: string; // For display in lists
+    lastMessageTime?: number;
+}
+
+// Initial Global Chat
+const globalChat: ChatRoom = {
+    id: 'global',
+    name: 'Global Chat',
+    type: 'group',
+    participants: ['alice', 'bob', 'charlie', 'dave', 'eve', 'frank'], // Everyone initially
+    avatar: 'https://picsum.photos/seed/group/40/40',
+    lastMessage: 'Perfect! I\'ll bring my A-game. ♟️',
+    lastMessageTime: initialMessages[initialMessages.length - 1]?.timestamp ?? Date.now(),
+};
 
 // Keep initialMessages for initial load simulation
 const initialMessages: Message[] = [
@@ -79,6 +111,7 @@ export function Chat() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null); // Ref for the viewport div
   const currentUser = 'Bob'; // Simulate the current user
+  const currentUserId = 'bob'; // Simulate current user ID
   const [isAddRoomSheetOpen, setIsAddRoomSheetOpen] = useState(false);
   const [friends, setFriends] = useState<Player[]>([]); // State for friends list
   const [filteredFriends, setFilteredFriends] = useState<Player[]>([]);
@@ -87,6 +120,8 @@ export function Chat() {
   const [groupName, setGroupName] = useState('');
   const { toast } = useToast();
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([globalChat]); // State to hold all chat rooms
+  const [currentChat, setCurrentChat] = useState<ChatRoom>(globalChat); // State for the currently viewed chat
 
 
   // --- Client-Side Mounting & Initial Load ---
@@ -94,12 +129,12 @@ export function Chat() {
     setIsClient(true);
     // Simulate fetching initial messages & friends
     const timer = setTimeout(() => {
+        // Load messages for the default chat (Global Chat)
         setMessages(initialMessages);
         setFriends(placeholderFriends); // Load placeholder friends
         setFilteredFriends(placeholderFriends); // Initialize filtered list
         setIsLoading(false);
-        // Use 'instant' for the initial scroll after loading messages
-        // Defer slightly to ensure layout is stable
+        // Scroll to bottom after initial load
         requestAnimationFrame(() => {
             setTimeout(() => scrollToBottom('instant'), 50);
         });
@@ -117,7 +152,8 @@ export function Chat() {
        const lowerCaseTerm = friendSearchTerm.toLowerCase();
        setFilteredFriends(
            friends.filter(friend =>
-               friend.name.toLowerCase().includes(lowerCaseTerm)
+               friend.name.toLowerCase().includes(lowerCaseTerm) ||
+               friend.kinectId.toLowerCase().includes(lowerCaseTerm) // Search by Kinect ID too
            )
        );
    }, [friendSearchTerm, friends]);
@@ -125,7 +161,7 @@ export function Chat() {
 
   // --- Scroll to Bottom Logic ---
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-      requestAnimationFrame(() => { // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
           const viewport = viewportRef.current;
           if (viewport) {
               viewport.scrollTo({ top: viewport.scrollHeight, behavior });
@@ -136,16 +172,18 @@ export function Chat() {
    // Scroll smoothly when new messages are added by the current user or when messages load initially
    useEffect(() => {
        if (!isLoading && messages.length > 0) {
-            // If the last message is from the current user, scroll smoothly
            if (messages[messages.length - 1]?.sender === currentUser) {
                scrollToBottom('smooth');
            } else {
-               // For received messages or initial load, check if user is near the bottom before auto-scrolling
                const viewport = viewportRef.current;
-               if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) { // Check if near bottom (e.g., within 150px)
+               if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
                  scrollToBottom('smooth');
                }
            }
+       }
+       // If switching chats and messages become empty, ensure view is scrolled to top/start
+       else if (!isLoading && messages.length === 0 && viewportRef.current) {
+            viewportRef.current.scrollTo({ top: 0, behavior: 'instant' });
        }
    }, [messages, currentUser, scrollToBottom, isLoading]);
 
@@ -154,52 +192,55 @@ export function Chat() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = newMessage.trim();
-    if (!trimmedMessage || isSending) return; // Prevent sending empty or duplicate messages
+    if (!trimmedMessage || isSending || currentChat.id === 'loading') return; // Prevent sending empty, duplicate or while loading
 
     setIsSending(true);
-    const tempId = `temp-${Date.now()}`; // Temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
 
     const messageData: Message = {
       id: tempId,
       sender: currentUser,
       text: trimmedMessage,
       timestamp: Date.now(),
-      avatar: 'https://picsum.photos/seed/bob/40/40', // Use current user's avatar
+      avatar: 'https://picsum.photos/seed/bob/40/40',
     };
 
-     // Optimistic UI update
-     setMessages(prevMessages => [...prevMessages, messageData]);
+     // Simulate API call to send message (would target currentChat.id)
+     console.log(`Sending to chat ${currentChat.id}:`, messageData);
+     // Optimistic UI update *only if in the correct chat*
+     // In a real app, WS would push the update
+     if (currentChat.id === globalChat.id) { // For demo, only update Global Chat optimistically
+        setMessages(prevMessages => [...prevMessages, messageData]);
+        scrollToBottom('smooth'); // Scroll after optimistic update
+     } else {
+         // If not in global chat, just show sending state and maybe clear input
+         // In real app, send to backend, rely on WS/refetch for update
+          toast({ title: "Message Sent", description: `To: ${currentChat.name}` });
+     }
+
      setNewMessage('');
-     // Scroll immediately after optimistic update
-     scrollToBottom('smooth');
 
 
-    // Simulate API call to send message
     await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Simulate receiving the message back with a real ID (or handle potential error)
-    // In a real app, replace the temp message with the one from the server
-    // For demo, we'll just keep the optimistic one.
-
     setIsSending(false);
 
-     // Simulate a reply from Alice after a short delay
-     setTimeout(() => {
-         const replyMessage: Message = {
-             id: String(Date.now()),
-             sender: 'Alice',
-             text: `Got it, ${currentUser}! 👋`,
-             timestamp: Date.now(),
-             avatar: 'https://picsum.photos/seed/alice/40/40',
-         };
-         setMessages(prevMessages => [...prevMessages, replyMessage]);
-         // Check if user is near the bottom before scrolling for received messages
-         const viewport = viewportRef.current;
-         if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
-            scrollToBottom('smooth');
-         }
-     }, 1500);
-
+     // Simulate a reply only in Global Chat for demo
+     if (currentChat.id === globalChat.id) {
+         setTimeout(() => {
+             const replyMessage: Message = {
+                 id: String(Date.now()),
+                 sender: 'Alice',
+                 text: `Got it, ${currentUser}! 👋`,
+                 timestamp: Date.now(),
+                 avatar: 'https://picsum.photos/seed/alice/40/40',
+             };
+             setMessages(prevMessages => [...prevMessages, replyMessage]);
+             const viewport = viewportRef.current;
+             if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
+                scrollToBottom('smooth');
+             }
+         }, 1500);
+     }
   };
 
   // --- Add Room Sheet Logic ---
@@ -213,58 +254,106 @@ export function Chat() {
 
    const handleCreateChat = async () => {
        if (selectedFriends.length === 0) {
-           toast({
-               variant: "destructive",
-               title: "No Friends Selected",
-               description: "Please select at least one friend to start a chat.",
-           });
+           toast({ variant: "destructive", title: "No Friends Selected" });
            return;
        }
-
        if (selectedFriends.length > 1 && !groupName.trim()) {
-           toast({
-               variant: "destructive",
-               title: "Group Name Required",
-               description: "Please enter a name for your group chat.",
-           });
+           toast({ variant: "destructive", title: "Group Name Required" });
            return;
        }
 
        setIsCreatingChat(true);
+       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate creation
 
-       // Simulate chat creation
-       await new Promise(resolve => setTimeout(resolve, 1000));
+       const selectedFriendDetails = friends.filter(f => selectedFriends.includes(f.id));
+       const participantIds = [currentUserId, ...selectedFriends]; // Include self
+       const isGroup = selectedFriends.length > 1;
 
-       const selectedFriendNames = friends
-           .filter(f => selectedFriends.includes(f.id))
-           .map(f => f.name);
-
-       let chatName: string;
-       if (selectedFriends.length === 1) {
-           chatName = selectedFriendNames[0]; // DM name is the friend's name
+       let newChat: ChatRoom;
+       if (isGroup) {
+            newChat = {
+                id: `group-${Date.now()}`, // Simple unique ID
+                name: groupName.trim(),
+                type: 'group',
+                participants: participantIds,
+                avatar: `https://picsum.photos/seed/${groupName.trim()}/40/40` // Placeholder avatar based on name
+            };
+            toast({ title: "Group Chat Created", description: `Started group: ${newChat.name}` });
        } else {
-           chatName = groupName.trim(); // Group chat name
+           const friend = selectedFriendDetails[0];
+            newChat = {
+                id: `dm-${friend.id}-${currentUserId}`, // Consistent DM ID (order might matter in real app)
+                name: friend.name, // DM name is the friend's name
+                type: 'dm',
+                participants: participantIds,
+                avatar: friend.avatar // Use friend's avatar for DM
+            };
+            toast({ title: "Direct Chat Started", description: `Chat with ${newChat.name} created.` });
        }
 
-       console.log(`Creating chat with: ${selectedFriendNames.join(', ')}`);
-       if (selectedFriends.length > 1) {
-           console.log(`Group Name: ${chatName}`);
-       }
+        // Add to chat list and switch to the new chat
+        setChatRooms(prev => [...prev, newChat]);
+        handleSwitchChat(newChat.id); // Switch to the newly created chat
 
-       toast({
-           title: "Chat Created",
-           description: `Started a chat: ${chatName}`,
-       });
+        // Reset form and close sheet
+        setIsCreatingChat(false);
+        setIsAddRoomSheetOpen(false);
+        setSelectedFriends([]);
+        setGroupName('');
+        setFriendSearchTerm('');
 
-        // Reset state and close sheet
-       setIsCreatingChat(false);
-       setIsAddRoomSheetOpen(false);
-       setSelectedFriends([]);
-       setGroupName('');
-       setFriendSearchTerm('');
-
-       // TODO: In a real app, you would navigate to the new chat room/update the chat list
+       // TODO: Update MySpace with the new group/chat link
+       // This would likely involve a shared state or context/props drilling
+       // For now, just log it.
+       console.log("New chat created, ID:", newChat.id, "Should update MySpace.");
    };
+
+   // --- Chat Switching Logic ---
+    const handleSwitchChat = (chatId: string) => {
+        if (chatId === currentChat.id || chatId === 'loading') return;
+
+        const targetChat = chatRooms.find(room => room.id === chatId);
+        if (!targetChat) return;
+
+        console.log(`Switching to chat: ${targetChat.name} (ID: ${chatId})`);
+
+        // Set loading state for messages
+        setIsLoading(true);
+        setCurrentChat({ id: 'loading', name: 'Loading...', type: 'group', participants: [] }); // Temporary loading state
+        setMessages([]); // Clear previous messages
+
+        // Simulate fetching messages for the new chat
+        setTimeout(() => {
+            setCurrentChat(targetChat);
+            if (targetChat.id === globalChat.id) {
+                setMessages(initialMessages); // Load global messages
+            } else {
+                // Simulate empty chat for newly created DMs/Groups
+                 setMessages([]); // Empty messages for other chats in this demo
+                 // In a real app, fetch messages for targetChat.id here
+            }
+            setIsLoading(false);
+            // Scroll to bottom (or top if empty) after switching
+            requestAnimationFrame(() => {
+                setTimeout(() => scrollToBottom(messages.length > 0 ? 'instant' : 'instant'), 50); // Instant scroll on switch
+            });
+        }, 500); // Simulate network delay for switching
+    };
+
+   // Get display details for the current chat
+   const currentChatDisplay = currentChat.id === 'loading' ? {
+       name: 'Loading...',
+       avatar: '',
+       fallback: 'L',
+       isOnline: false
+   } : {
+       name: currentChat.name,
+       avatar: currentChat.avatar || '',
+       fallback: currentChat.name.charAt(0).toUpperCase(),
+       // Basic online status simulation (only for DMs for now)
+       isOnline: currentChat.type === 'dm' && friends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online'
+   };
+
 
 
   // --- Rendering ---
@@ -272,18 +361,79 @@ export function Chat() {
     // Use flex-col and h-full to ensure it fills the parent container
     <div className="flex flex-col h-full bg-background">
       {/* Chat Header */}
-       <CardHeader className="flex flex-row items-center justify-between border-b border-border p-3 sm:p-4 sticky top-0 bg-background/80 backdrop-blur-sm z-10 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          {/* Use a generic group icon or specific chat icon */}
-          <div className="relative">
-              <Avatar className="h-8 w-8 border-2 border-primary/50">
-                  <AvatarImage src="https://picsum.photos/seed/group/40/40" alt="Global Chat" />
-                  <AvatarFallback>GC</AvatarFallback>
-              </Avatar>
-               <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"></span>
-          </div>
-          <CardTitle className="text-base sm:text-lg font-semibold leading-tight">Global Chat</CardTitle>
-        </div>
+       <CardHeader className="flex flex-row items-center justify-between border-b border-border p-3 sm:p-4 sticky top-0 bg-background/90 backdrop-blur-sm z-10 flex-shrink-0">
+        {/* Chat Switcher Dropdown */}
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring">
+                    <div className="relative">
+                        <Avatar className={cn("h-8 w-8 border-2", currentChatDisplay.isOnline ? "border-green-500/70" : "border-border/50")}>
+                            <AvatarImage src={currentChatDisplay.avatar} alt={currentChatDisplay.name} />
+                            <AvatarFallback>{currentChatDisplay.fallback}</AvatarFallback>
+                        </Avatar>
+                         {currentChatDisplay.isOnline && (
+                            <span className="absolute bottom-[-2px] right-[-2px] block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"></span>
+                         )}
+                    </div>
+                    <CardTitle className="text-base sm:text-lg font-semibold leading-tight truncate max-w-[150px] sm:max-w-[250px]">
+                        {currentChatDisplay.name}
+                    </CardTitle>
+                    <ChevronsUpDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+                <DropdownMenuLabel>Chats</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                 <DropdownMenuGroup>
+                     {/* Global Chat Always First */}
+                     <DropdownMenuItem
+                        key={globalChat.id}
+                        onSelect={() => handleSwitchChat(globalChat.id)}
+                        className={cn("flex items-center gap-2 cursor-pointer", currentChat.id === globalChat.id && "bg-accent")}
+                      >
+                        <Hash className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">{globalChat.name}</span>
+                     </DropdownMenuItem>
+
+                     {/* DMs */}
+                     {chatRooms.filter(room => room.type === 'dm').map(room => (
+                         <DropdownMenuItem
+                            key={room.id}
+                            onSelect={() => handleSwitchChat(room.id)}
+                            className={cn("flex items-center gap-2 cursor-pointer", currentChat.id === room.id && "bg-accent")}
+                          >
+                              <Avatar className="h-5 w-5">
+                                  <AvatarImage src={room.avatar} alt={room.name} />
+                                  <AvatarFallback>{room.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                            <span className="truncate">{room.name}</span>
+                         </DropdownMenuItem>
+                     ))}
+
+                     {/* Groups */}
+                     {chatRooms.filter(room => room.type === 'group' && room.id !== globalChat.id).map(room => (
+                          <DropdownMenuItem
+                            key={room.id}
+                            onSelect={() => handleSwitchChat(room.id)}
+                            className={cn("flex items-center gap-2 cursor-pointer", currentChat.id === room.id && "bg-accent")}
+                          >
+                            <Avatar className="h-5 w-5">
+                                <AvatarImage src={room.avatar} alt={room.name} />
+                                <AvatarFallback>#</AvatarFallback>
+                            </Avatar>
+                            <span className="truncate">{room.name}</span>
+                          </DropdownMenuItem>
+                     ))}
+                </DropdownMenuGroup>
+                 <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setIsAddRoomSheetOpen(true)} className="flex items-center gap-2 cursor-pointer">
+                      <PlusCircle className="h-4 w-4 text-muted-foreground" />
+                      <span>Create New Chat...</span>
+                  </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+
+         {/* Action Buttons */}
          {isClient ? (
             <TooltipProvider delayDuration={200}>
                 <div className="flex items-center gap-1">
@@ -292,15 +442,15 @@ export function Chat() {
                             {/* Add Room Sheet Trigger */}
                              <Sheet open={isAddRoomSheetOpen} onOpenChange={setIsAddRoomSheetOpen}>
                                 <SheetTrigger asChild>
-                                    <Button variant="ghost" size="icon" aria-label="Add Room" className="text-muted-foreground hover:text-foreground">
+                                    <Button variant="ghost" size="icon" aria-label="Create New Chat" className="text-muted-foreground hover:text-foreground">
                                         <PlusCircle className="h-5 w-5" />
                                     </Button>
                                 </SheetTrigger>
-                                 <SheetContent side="left" className="sm:max-w-sm flex flex-col">
-                                    <SheetHeader className="px-4 pt-4">
+                                 <SheetContent side="left" className="sm:max-w-sm flex flex-col p-0">
+                                    <SheetHeader className="px-4 pt-4 pb-2 border-b">
                                         <SheetTitle>Create New Chat</SheetTitle>
                                         <SheetDescription>
-                                            Select friends to start a direct message or group chat.
+                                            Select friends for a DM or group chat.
                                         </SheetDescription>
                                     </SheetHeader>
                                      {/* Search Input */}
@@ -308,7 +458,7 @@ export function Chat() {
                                         <div className="relative">
                                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                             <Input
-                                                placeholder="Search friends..."
+                                                placeholder="Search friends by name or ID..."
                                                 className="pl-8 h-9 bg-muted/50"
                                                 value={friendSearchTerm}
                                                 onChange={(e) => setFriendSearchTerm(e.target.value)}
@@ -319,13 +469,14 @@ export function Chat() {
                                      {/* Group Name Input (Conditional) */}
                                      {selectedFriends.length > 1 && (
                                         <div className="px-4 pt-4">
-                                            <Label htmlFor="group-name">Group Name</Label>
+                                            <Label htmlFor="group-name" className="text-xs font-medium text-muted-foreground">Group Name</Label>
                                             <Input
                                                 id="group-name"
                                                 placeholder="Enter group chat name"
                                                 value={groupName}
                                                 onChange={(e) => setGroupName(e.target.value)}
                                                 className="mt-1 h-9"
+                                                required
                                             />
                                         </div>
                                      )}
@@ -350,7 +501,10 @@ export function Chat() {
                                                                 <AvatarImage src={friend.avatar} alt={friend.name} />
                                                                 <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
-                                                            <span className="text-sm font-medium">{friend.name}</span>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium">{friend.name}</span>
+                                                                 <span className="text-xs text-muted-foreground">{friend.kinectId}</span>
+                                                            </div>
                                                         </div>
                                                         <Checkbox
                                                             checked={selectedFriends.includes(friend.id)}
@@ -363,13 +517,14 @@ export function Chat() {
                                             </div>
                                          )}
                                     </ScrollArea>
-                                    <SheetFooter className="px-4 pb-4 pt-2 border-t">
+                                    <SheetFooter className="px-4 pb-4 pt-2 border-t bg-background">
                                          <SheetClose asChild>
-                                             <Button variant="outline">Cancel</Button>
+                                             <Button variant="outline" className="flex-1 sm:flex-none">Cancel</Button>
                                          </SheetClose>
                                         <Button
                                             onClick={handleCreateChat}
                                             disabled={selectedFriends.length === 0 || isCreatingChat || (selectedFriends.length > 1 && !groupName.trim())}
+                                            className="flex-1 sm:flex-none"
                                         >
                                             {isCreatingChat ? (
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -382,15 +537,17 @@ export function Chat() {
                                 </SheetContent>
                              </Sheet>
                         </TooltipTrigger>
-                        <TooltipContent>Add Room</TooltipContent>
+                        <TooltipContent>New Chat</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="View Users" className="text-muted-foreground hover:text-foreground">
-                                <Users className="h-5 w-5" />
+                            <Button variant="ghost" size="icon" aria-label="View Chat Members" className="text-muted-foreground hover:text-foreground">
+                                {currentChat.type === 'group' ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>View Users (3)</TooltipContent>
+                        <TooltipContent>
+                            {currentChat.type === 'group' ? `View Members (${currentChat.participants.length})` : `View Profile`}
+                        </TooltipContent>
                     </Tooltip>
                 </div>
             </TooltipProvider>
@@ -402,14 +559,10 @@ export function Chat() {
          )}
       </CardHeader>
 
-      {/* Chat Messages Area - Use flex-1 to take remaining space */}
+      {/* Chat Messages Area */}
       <CardContent className="flex-1 p-0 overflow-hidden">
-         {/* ScrollArea takes full height of the CardContent */}
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          {/* Viewport needs a direct ref */}
-          {/* Removed h-full from viewport, ScrollArea handles height */}
-          <div ref={viewportRef}>
-             {/* Inner container for padding and messages - Added pb-4 for spacing above input */}
+          <div ref={viewportRef} className="h-full"> {/* Viewport takes full height */}
               <div className="p-4 space-y-4 pb-4">
                 {isLoading ? (
                     // Loading Skeletons
@@ -418,15 +571,12 @@ export function Chat() {
                            <div key={`skel-${i}`} className={cn("flex gap-3", i % 2 === 0 ? 'justify-start' : 'justify-end')}>
                                {i % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
                                <div className={cn("flex flex-col gap-1.5", i % 2 === 0 ? 'items-start' : 'items-end')}>
-                                   <Skeleton className={cn("h-4 w-20", i % 2 !== 0 && 'hidden')} /> {/* Sender name */}
+                                   <Skeleton className={cn("h-4 w-20", i % 2 !== 0 && 'hidden')} />
                                    <Skeleton className={cn("h-10 rounded-lg", i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-32' : 'w-40')} />
-                                   {/* Skeleton for timestamp - ensure it renders without causing nesting issues */}
-                                   <span className={cn(
-                                       "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]",
-                                       'opacity-0' // Hide timestamp skeleton initially
-                                   )}>
-                                     <Skeleton className="h-3 w-10 inline-block" /> {/* Timestamp */}
-                                   </span>
+                                   {/* Timestamp Skeleton */}
+                                    <span className="text-[10px] opacity-0 mt-1 self-end min-h-[1em]">
+                                        <Skeleton className="h-3 w-10 inline-block" />
+                                    </span>
                                </div>
                                {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
                            </div>
@@ -436,30 +586,25 @@ export function Chat() {
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-center pt-20">
                         <MessageSquare className="h-12 w-12 mb-4 opacity-50" />
                         <p className="text-lg font-medium">No messages yet</p>
-                        <p className="text-sm">Start the conversation!</p>
+                        <p className="text-sm">
+                           {currentChat.type === 'dm' ? `Start chatting with ${currentChat.name}!` : `Start the conversation in ${currentChat.name}!`}
+                        </p>
                     </div>
                  ) : (
                     // Actual Messages
                     messages.map((msg, index) => {
                       const isCurrentUser = msg.sender === currentUser;
-                      // Show avatar if it's not the current user AND (it's the first message OR the previous message sender is different)
                       const showAvatar = !isCurrentUser && (index === 0 || messages[index - 1]?.sender !== msg.sender);
-                      // Show timestamp if it's the last message OR the next message sender is different OR next message is more than 5 mins later
                       const nextMessageTimestamp = messages[index + 1]?.timestamp;
                       const timeDiff = nextMessageTimestamp ? nextMessageTimestamp - msg.timestamp : Infinity;
                       const showTimestamp = index === messages.length - 1 || messages[index + 1]?.sender !== msg.sender || timeDiff > 5 * 60 * 1000;
 
-
                       return (
                          <div
                           key={msg.id}
-                          className={cn(
-                            "flex gap-2", // Reduced gap
-                            isCurrentUser ? 'justify-end pl-10' : 'justify-start pr-10' // Add padding to opposite side
-                          )}
+                          className={cn( "flex gap-2", isCurrentUser ? 'justify-end pl-10' : 'justify-start pr-10')}
                          >
-                           {/* Sender Avatar (Conditional) */}
-                           <div className="w-8 flex-shrink-0 self-end"> {/* Align avatar to bottom */}
+                           <div className="w-8 flex-shrink-0 self-end">
                             {showAvatar && (
                                 <TooltipProvider delayDuration={300}>
                                     <Tooltip>
@@ -475,35 +620,26 @@ export function Chat() {
                             )}
                            </div>
 
-
-                            {/* Message Bubble */}
                             <div
                               className={cn(
-                                "max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm relative flex flex-col", // Flex column for text and timestamp
+                                "max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm relative flex flex-col",
                                 isCurrentUser
                                   ? 'bg-primary text-primary-foreground rounded-br-none animate-in slide-in-from-right-4 duration-300 ease-out'
                                   : 'bg-muted text-foreground rounded-bl-none animate-in slide-in-from-left-4 duration-300 ease-out',
-                                // Add margin top if avatar is not shown AND previous sender is the same
                                 (!showAvatar && index > 0 && messages[index-1].sender === msg.sender) ? 'mt-1' : 'mt-0'
                               )}
                             >
-                                {/* Sender Name (only if showing avatar and not current user) */}
-                                {showAvatar && !isCurrentUser && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
-                                {/* Message Text */}
-                                <p className="leading-snug break-words">{msg.text}</p> {/* Improved line height, ensure word breaks */}
-
-                                {/* Timestamp (conditionally displayed, aligned right within bubble) */}
-                                {/* Render only on client to avoid hydration issues */}
+                                {showAvatar && !isCurrentUser && currentChat.type === 'group' && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
+                                <p className="leading-snug break-words">{msg.text}</p>
                                 {isClient && (
                                     <span className={cn(
-                                        "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for layout stability
-                                        showTimestamp ? 'opacity-60' : 'opacity-0' // Hide if not last message of group
+                                        "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]",
+                                        showTimestamp ? 'opacity-60' : 'opacity-0'
                                     )}>
                                        {format(new Date(msg.timestamp), 'p')}
                                     </span>
                                 )}
                             </div>
-
                          </div>
                       );
                   })
@@ -514,12 +650,10 @@ export function Chat() {
       </CardContent>
 
       {/* Chat Input Bar */}
-      {/* Use flex-shrink-0 to prevent it from shrinking. */}
       <div className="p-2 sm:p-4 border-t border-border bg-background flex-shrink-0">
          {isClient ? (
            <TooltipProvider delayDuration={200}>
              <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-1 sm:space-x-2">
-                {/* Action Buttons (Condensed) */}
                  <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground">
@@ -545,22 +679,20 @@ export function Chat() {
                     <TooltipContent>AI Assistant</TooltipContent>
                 </Tooltip>
 
-                {/* Input Field */}
                 <Input
                     type="text"
                     placeholder="Type a message..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="flex-1 bg-muted/50 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200" // Use primary ring
+                    className="flex-1 bg-muted/50 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200"
                     aria-label="Chat message input"
-                    disabled={isSending} // Disable input while sending
+                    disabled={isSending || isLoading || currentChat.id === 'loading'} // Disable while sending or loading chats
                     autoComplete="off"
                 />
 
-                {/* Send Button */}
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0" aria-label="Send message" disabled={isSending || !newMessage.trim()}>
+                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0" aria-label="Send message" disabled={isSending || !newMessage.trim() || isLoading || currentChat.id === 'loading'}>
                              {isSending ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
                              ) : (
@@ -573,7 +705,6 @@ export function Chat() {
             </form>
           </TooltipProvider>
          ) : (
-            // Skeleton Loader for Input Bar
             <div className="flex w-full items-center space-x-2">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <Skeleton className="h-10 w-10 rounded-full" />
