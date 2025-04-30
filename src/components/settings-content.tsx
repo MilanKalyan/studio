@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,18 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy, Loader2 } from "lucide-react"; // Added Loader2
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
+import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy, Loader2, Move } from "lucide-react"; // Added Loader2 and Move
 import { Separator } from "@/components/ui/separator";
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react"; // Import useState and useEffect
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { cn } from "@/lib/utils"; // Import cn
+
+// Define position type, should match the one in bottom-navigation.tsx
+type NavPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 interface SettingsContentProps {
     onLogout: () => void; // Define the prop type
+    setNavPosition: (position: NavPosition) => void; // Callback to change nav position
+    currentNavPosition: NavPosition; // Current position to set default value
 }
 
-export function SettingsContent({ onLogout }: SettingsContentProps) { // Accept the prop
+
+export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }: SettingsContentProps) { // Accept props
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isClient, setIsClient] = useState(false); // State for client-side rendering check
@@ -106,6 +115,14 @@ export function SettingsContent({ onLogout }: SettingsContentProps) { // Accept 
          }
         toast({ title: "Theme Updated", description: `Theme set to ${value}.`, duration: 2000 });
     };
+
+    // Handle navigation position change
+    const handleNavPositionChange = (value: NavPosition) => {
+        setNavPosition(value); // Call the callback passed from props
+        // Optionally save this preference (e.g., in localStorage)
+        localStorage.setItem('navPosition', value);
+        toast({ title: "Navigation Position Updated", description: `Moved menu to ${value.replace('-', ' ')}.`, duration: 2000 });
+    }
 
 
   return (
@@ -212,7 +229,7 @@ export function SettingsContent({ onLogout }: SettingsContentProps) { // Accept 
           <CardTitle className="text-lg flex items-center gap-2"><Palette className="h-5 w-5 text-primary" /> Appearance</CardTitle>
            <CardDescription>Customize the look and feel of the app.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6"> {/* Increased spacing */}
           <div className="flex items-center justify-between">
             <Label htmlFor="theme-select">Theme</Label>
             <Select
@@ -229,6 +246,26 @@ export function SettingsContent({ onLogout }: SettingsContentProps) { // Accept 
                     <SelectItem value="system">System</SelectItem>
                  </SelectContent>
             </Select>
+          </div>
+
+          {/* Navigation Position Control */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2"><Move className="h-4 w-4"/> Navigation Position</Label>
+            <RadioGroup
+                defaultValue={currentNavPosition}
+                onValueChange={(value) => handleNavPositionChange(value as NavPosition)}
+                className="grid grid-cols-2 gap-4"
+                disabled={!isClient}
+             >
+              {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as NavPosition[]).map((pos) => (
+                <div key={pos} className="flex items-center space-x-2">
+                  <RadioGroupItem value={pos} id={`nav-pos-${pos}`} />
+                  <Label htmlFor={`nav-pos-${pos}`} className="capitalize text-sm font-normal">
+                    {pos.replace('-', ' ')}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
            {/* Add more appearance settings like font size, chat density etc. */}
         </CardContent>

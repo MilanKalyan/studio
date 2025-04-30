@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home, MessageCircle, LayoutGrid, Gamepad2, Compass, Settings, User, X as CloseIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,15 +39,91 @@ interface NavItemSheet extends NavItemBase {
 
 type NavItem = NavItemLink | NavItemSheet;
 
+type NavPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
 interface BottomNavigationProps {
   onLogout: () => void; // Add onLogout prop
+  initialPosition?: NavPosition; // Allow setting initial position
 }
 
-export function BottomNavigation({ onLogout }: BottomNavigationProps) {
+// Mappings for position styles
+const positionStyles: Record<NavPosition, { fab: string; menu: string; tooltipSide: 'left' | 'right' | 'top' | 'bottom' }> = {
+  'bottom-right': {
+    fab: 'bottom-4 right-4',
+    menu: 'bottom-[76px] right-4 items-end',
+    tooltipSide: 'left',
+  },
+  'bottom-left': {
+    fab: 'bottom-4 left-4',
+    menu: 'bottom-[76px] left-4 items-start',
+    tooltipSide: 'right',
+  },
+  'top-right': {
+    fab: 'top-4 right-4',
+    menu: 'top-[76px] right-4 items-end',
+    tooltipSide: 'left',
+  },
+  'top-left': {
+    fab: 'top-4 left-4',
+    menu: 'top-[76px] left-4 items-start',
+    tooltipSide: 'right',
+  },
+};
+
+export function BottomNavigation({ onLogout, initialPosition = 'bottom-right' }: BottomNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [openSheet, setOpenSheet] = useState<string | null>(null);
   const [isNavOpen, setIsNavOpen] = useState(false); // State for the main circle toggle
+  const [navPosition, setNavPosition] = useState<NavPosition>(() => {
+      // Try to get position from localStorage, default to initialPosition
+      if (typeof window !== 'undefined') {
+          const savedPosition = localStorage.getItem('navPosition') as NavPosition | null;
+          return savedPosition && positionStyles[savedPosition] ? savedPosition : initialPosition;
+      }
+      return initialPosition;
+  });
+
+  // Example: Allow cycling through positions by clicking the FAB 5 times quickly (demo purpose)
+  // In a real app, this would be controlled via settings
+  const [clickCount, setClickCount] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
+
+  useEffect(() => {
+    // Reset click count if too much time passes
+    if (Date.now() - lastClickTime > 1000) {
+      setClickCount(0);
+    }
+  }, [lastClickTime]);
+
+  const cyclePosition = () => {
+    const positions: NavPosition[] = ['bottom-right', 'bottom-left', 'top-left', 'top-right'];
+    const currentIndex = positions.indexOf(navPosition);
+    const nextIndex = (currentIndex + 1) % positions.length;
+    const nextPosition = positions[nextIndex];
+    setNavPosition(nextPosition);
+    localStorage.setItem('navPosition', nextPosition); // Save new position
+    setClickCount(0); // Reset count after cycling
+  };
+
+  const handleFabClick = () => {
+    const now = Date.now();
+    if (now - lastClickTime < 300) { // Check for rapid clicks (e.g., within 300ms)
+      const newCount = clickCount + 1;
+      setClickCount(newCount);
+      if (newCount >= 4) { // Cycle after 5 rapid clicks (0, 1, 2, 3, 4)
+        cyclePosition();
+        setIsNavOpen(false); // Close nav after cycling
+      } else {
+         toggleNav(); // Normal toggle if not cycling
+      }
+    } else {
+      setClickCount(0); // Reset count if click is slow
+      toggleNav(); // Normal toggle
+    }
+    setLastClickTime(now);
+  };
+  // End demo cycle logic
 
   // Define nav items inside the component to access onLogout
   const navItems: NavItem[] = [
@@ -74,7 +150,8 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
       label: 'Settings',
       icon: Settings,
       isSheet: true,
-      sheetContent: SettingsContent,
+      // Pass setNavPosition to settings to allow changing position
+      sheetContent: (props) => <SettingsContent {...props} setNavPosition={setNavPosition} currentNavPosition={navPosition} />,
       sheetProps: { onLogout }, // Pass onLogout to SettingsContent
       sheetTitle: 'Settings',
     },
@@ -103,41 +180,50 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
        setOpenSheet(null); // Close any open sheet when toggling main nav
    }
 
+   const currentPositionStyles = positionStyles[navPosition];
+
   return (
     <TooltipProvider delayDuration={100}>
-        {/* Floating Action Button (FAB) to toggle the main navigation */}
-        <div className="fixed bottom-4 right-4 z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms]">
+        {/* Floating Action Button (FAB) Container - Position is controlled here */}
+        <div className={cn(
+            "fixed z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms]",
+            currentPositionStyles.fab
+        )}>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
                         size="icon"
                         className={cn(
-                            "rounded-full w-14 h-14 shadow-lg retro-glow transition-transform duration-300 ease-out",
-                            isNavOpen ? "scale-110 bg-primary/80" : "hover:scale-110 active:scale-100"
+                            "rounded-full w-14 h-14 shadow-lg retro-glow transition-all duration-300 ease-out", // Added transition-all
+                            isNavOpen ? "scale-110 bg-primary/80 rotate-90" : "hover:scale-110 active:scale-100 rotate-0" // Rotate icon on open
                         )}
-                        onClick={toggleNav}
+                        // onClick={toggleNav} // Use handleFabClick for demo cycle logic
+                        onClick={handleFabClick}
                         aria-label={isNavOpen ? "Close Navigation" : "Open Navigation"}
                         aria-expanded={isNavOpen}
                     >
-                        {isNavOpen ? <CloseIcon className="h-6 w-6" /> : <Home className="h-6 w-6" />}
+                        {isNavOpen ? <CloseIcon className="h-6 w-6 transition-transform duration-300" /> : <Home className="h-6 w-6 transition-transform duration-300" />}
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent side="left">{isNavOpen ? "Close" : "Menu"}</TooltipContent>
+                {/* Adjust tooltip side based on position */}
+                <TooltipContent side={currentPositionStyles.tooltipSide}>{isNavOpen ? "Close" : "Menu"}</TooltipContent>
             </Tooltip>
         </div>
 
-        {/* Navigation Items Container - Appears when FAB is clicked */}
-        {/* Positioned slightly above the FAB */}
+        {/* Navigation Items Container - Position is controlled here */}
+        {/* Adjust transform-origin based on position */}
         <div
             className={cn(
-                "fixed bottom-[76px] right-4 z-50 flex flex-col items-end gap-3 transition-all duration-300 ease-out",
-                isNavOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+                "fixed z-50 flex flex-col gap-3 transition-all duration-300 ease-out",
+                currentPositionStyles.menu, // Apply position classes
+                isNavOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95 pointer-events-none", // Adjusted animation
+                navPosition.includes('bottom') ? (navPosition.includes('left') ? 'origin-bottom-left' : 'origin-bottom-right') : '',
+                navPosition.includes('top') ? (navPosition.includes('left') ? 'origin-top-left' : 'origin-top-right') : ''
             )}
             aria-hidden={!isNavOpen} // Hide from screen readers when closed
         >
-            {navItems.map((item) => {
+            {navItems.map((item, index) => {
             const isActive = !item.isSheet && pathname === item.path;
-            const isSheetTrigger = item.isSheet;
 
             const buttonContent = (
                 <item.icon className={cn(
@@ -158,6 +244,7 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                                     size="icon"
                                     className={cn(
                                         "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out",
+                                         `delay-${index * 50}`, // Stagger animation
                                         openSheet === item.id ? 'scale-105 bg-primary/10 text-primary' : 'hover:scale-105 active:scale-100'
                                     )}
                                     aria-label={`Open ${item.label} sheet`}
@@ -167,7 +254,8 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                                 </Button>
                             </SheetTrigger>
                         </TooltipTrigger>
-                        <TooltipContent side="left" className="bg-secondary text-secondary-foreground">
+                         {/* Adjust tooltip side based on position */}
+                        <TooltipContent side={currentPositionStyles.tooltipSide} className="bg-secondary text-secondary-foreground">
                             {item.label}
                         </TooltipContent>
                     </Tooltip>
@@ -176,7 +264,13 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                             <SheetTitle className="text-center text-lg">{item.sheetTitle}</SheetTitle>
                         </SheetHeader>
                         <div className="flex-1 overflow-y-auto pt-2 pb-4">
-                            <SheetContentComponent {...item.sheetProps} />
+                             {/* Pass potential props needed by sheet content */}
+                             {/* Ensure sheetProps includes setNavPosition if SettingsContent needs it directly */}
+                            <SheetContentComponent
+                                {...item.sheetProps}
+                                // SettingsContent now receives setNavPosition and currentNavPosition via its props defined in the navItems array
+                                // No need to explicitly pass them here again unless they weren't in sheetProps
+                            />
                         </div>
                     </SheetContent>
                 </Sheet>
@@ -192,6 +286,7 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                         size="icon"
                         className={cn(
                             "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out",
+                             `delay-${index * 50}`, // Stagger animation
                             isActive ? 'scale-105 ring-2 ring-primary ring-offset-2 ring-offset-background' : 'hover:scale-105 active:scale-100'
                         )}
                         onClick={() => handleNavigation(item)}
@@ -200,7 +295,8 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                         {buttonContent}
                     </Button>
                 </TooltipTrigger>
-                 <TooltipContent side="left" className={cn(isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
+                 {/* Adjust tooltip side based on position */}
+                 <TooltipContent side={currentPositionStyles.tooltipSide} className={cn(isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
                     {item.label}
                 </TooltipContent>
                 </Tooltip>
@@ -210,4 +306,20 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
     </TooltipProvider>
   );
 }
+
+// Helper function to generate Tailwind delay classes (optional, can inline)
+function generateDelayClasses() {
+  const delays = [0, 50, 75, 100, 150, 200, 300, 500];
+  return delays.map(d => `delay-${d}`).join(' ');
+}
+// You might need to configure Tailwind Safelist if you generate classes dynamically like this:
+// tailwind.config.js
+// module.exports = {
+//   safelist: [
+//     {
+//       pattern: /delay-\d+/,
+//     },
+//   ],
+//   // ... rest of config
+// };
 
