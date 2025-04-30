@@ -4,7 +4,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Folder, Star, Users, Clock, UserPlus, Search, Loader2, Hash } from "lucide-react"; // Added Hash
+import { Folder, Star, Users, Clock, UserPlus, Search, Loader2, Hash, MessageCircle } from "lucide-react"; // Added Hash, MessageCircle
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import type { ChatRoom } from './chat'; // Import ChatRoom type
+import type { ChatRoom, Player } from './chat'; // Import types
 import { formatDistanceToNow } from 'date-fns'; // Import for relative time
 
 // Placeholder data - replace with actual user data fetching
@@ -29,16 +29,7 @@ const placeholderFavoriteGames = [
     { id: 'checkers', name: 'Checkers', img: 'https://picsum.photos/seed/checkers/100/100' },
 ];
 
-// Placeholder Player type definition (copied from chat.tsx)
-interface Player {
-    id: string;
-    name: string;
-    avatar: string;
-    status: 'online' | 'offline' | 'ingame';
-    kinectId: string;
-}
-
-// Placeholder friends data (copied from chat.tsx)
+// Placeholder friends data
 const placeholderFriends: Player[] = [
      { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online', kinectId: 'KINECT#1234'},
      { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline', kinectId: 'KINECT#5678'},
@@ -47,54 +38,32 @@ const placeholderFriends: Player[] = [
      { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline', kinectId: 'KINECT#7890'},
 ];
 
-// Define initial Global Chat for demonstration
-const initialGlobalChat: ChatRoom = {
-    id: 'global',
-    name: 'Global Chat',
-    type: 'group',
-    participants: ['alice', 'bob', 'charlie', 'dave', 'eve', 'frank'],
-    avatar: 'https://picsum.photos/seed/group/40/40',
-    lastMessage: 'Perfect! I\'ll bring my A-game. ♟️',
-    lastMessageTime: Date.now(), // Simplified for demo
-};
 
-
-// Props for MySpaceContent
+// Props for MySpaceContent - receives chatRooms and onSwitchChat from BottomNavigation -> Home
 interface MySpaceContentProps {
-    // Function to switch chat in the main Chat component
-    onSwitchChat?: (chatId: string) => void;
-    // Pass chat rooms list (needs to be managed outside and passed in)
-    // For demo, we'll use a local state initialized with global chat
-    // chatRooms: ChatRoom[];
+    chatRooms: ChatRoom[];
+    onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void; // Allow passing new chat details
 }
 
-export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
+export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps) {
   const { toast } = useToast();
   const [friendIdInput, setFriendIdInput] = useState('');
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [isLoading, setIsLoading] = useState(true); // Loading state for sections
   const [recentActivities, setRecentActivities] = useState<typeof placeholderRecentActivities>([]);
   const [favoriteGames, setFavoriteGames] = useState<typeof placeholderFavoriteGames>([]);
-  const [friends, setFriends] = useState<typeof placeholderFriends>([]);
+  const [friends, setFriends] = useState<typeof placeholderFriends>([]); // Keep friends list local for Add Friend functionality
   const [isClient, setIsClient] = useState(false);
-  // Local state for chat rooms, initialized with global chat.
-  // In a real app, this would likely come from props or a shared context.
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([initialGlobalChat]);
+  const currentUserId = 'bob'; // Simulate current user ID for DM creation
 
 
   useEffect(() => {
       setIsClient(true);
-      // Simulate loading data
+      // Simulate loading data (except chatRooms which comes from props)
       const timer = setTimeout(() => {
           setRecentActivities(placeholderRecentActivities);
           setFavoriteGames(placeholderFavoriteGames);
-          setFriends(placeholderFriends);
-          // Simulate adding a DM and another group chat after load for demonstration
-          setChatRooms(prev => [
-              ...prev,
-               { id: `dm-alice-bob`, name: 'Alice', type: 'dm', participants: ['bob', 'alice'], avatar: 'https://picsum.photos/seed/alice/40/40', lastMessage: 'Awesome! See you then. 😄', lastMessageTime: Date.now() - 300000 },
-               { id: `group-chess-club`, name: 'Chess Club', type: 'group', participants: ['bob', 'alice', 'charlie'], avatar: 'https://picsum.photos/seed/chessclub/40/40', lastMessage: 'Bob: Chess works! Let\'s do that.', lastMessageTime: Date.now() - 15000 },
-          ]);
+          setFriends(placeholderFriends); // Still load local friends data
           setIsLoading(false);
       }, 800); // Simulate loading delay
 
@@ -143,19 +112,44 @@ export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
      setIsAddingFriend(false);
    };
 
-    // Function to handle clicking on a chat
+    // Function to handle clicking on a chat in the list
     const handleChatClick = (chatId: string) => {
-        console.log("Clicked chat:", chatId);
-        // If onSwitchChat prop exists, call it
-        if (onSwitchChat) {
-            onSwitchChat(chatId);
-            // Maybe close the sheet after switching? Depends on UX.
-        } else {
-            toast({ title: "Switching Chat (Placeholder)", description: `Would switch to chat ID: ${chatId}`, duration: 2000 });
-        }
+        console.log("MySpace: Clicked chat:", chatId);
+        // Use the onSwitchChat prop passed down from Home
+        onSwitchChat(chatId);
+        // Optionally close the sheet after switching
+        // This might require passing the setOpenSheet function down or using a context
     };
 
-   // Sort chat rooms by last message time (most recent first)
+     // Function to handle clicking a friend to start/open a DM
+     const handleFriendClick = (friend: Player) => {
+         console.log("MySpace: Clicked friend:", friend.name);
+         // Generate the potential DM chat ID
+         const dmId = `dm-${[currentUserId, friend.id].sort().join('-')}`;
+
+         // Check if the DM chat room already exists in the passed chatRooms prop
+         const existingDm = chatRooms.find(room => room.id === dmId);
+
+         if (existingDm) {
+             // If it exists, just switch to it
+             onSwitchChat(dmId);
+         } else {
+             // If it doesn't exist, create the details and pass them to onSwitchChat
+             const newDmDetails: ChatRoom = {
+                 id: dmId,
+                 name: friend.name,
+                 type: 'dm',
+                 participants: [currentUserId, friend.id],
+                 avatar: friend.avatar,
+                 // lastMessage and lastMessageTime will be updated when messages are sent
+             };
+             onSwitchChat(dmId, newDmDetails); // Pass the details to create and switch
+         }
+         // Optionally close the sheet
+     };
+
+
+   // Sort chat rooms by last message time (most recent first) using the prop
    const sortedChatRooms = [...chatRooms].sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
 
 
@@ -167,6 +161,7 @@ export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
                 <CardTitle className="text-md font-semibold flex items-center gap-2">
                     <Hash className="h-5 w-5 text-primary" /> My Chats
                 </CardTitle>
+                {/* Consider adding a "Create Chat" button here too */}
                 <Button variant="ghost" size="sm" className="text-xs h-7" disabled={isLoading}>See All</Button>
             </CardHeader>
             <CardContent>
@@ -184,11 +179,12 @@ export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
                     </div>
                 ) : (
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {/* Use sortedChatRooms derived from props */}
                         {sortedChatRooms.map(room => (
                             <div
                                 key={room.id}
                                 className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                                onClick={() => handleChatClick(room.id)}
+                                onClick={() => handleChatClick(room.id)} // Use the handler
                                 role="button"
                                 tabIndex={0}
                                 aria-label={`Open chat ${room.name}`}
@@ -316,11 +312,6 @@ export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
                     {isAddingFriend ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
                 </Button>
             </form>
-            {/* Search Friends (Optional) */}
-             {/* <div className="relative mt-2">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search friends..." className="pl-8 h-9 bg-muted/50" />
-            </div> */}
         </CardHeader>
         <CardContent>
            {/* Existing Friends List */}
@@ -339,8 +330,12 @@ export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
            ) : (
             <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                 {friends.map(friend => (
-                    <div key={friend.id} className="flex items-center justify-between hover:bg-muted/50 px-1 -mx-1 rounded transition-colors cursor-pointer"
-                         onClick={() => { /* Open chat or profile */ }}>
+                    <div key={friend.id} className="flex items-center justify-between group hover:bg-muted/50 px-1 -mx-1 rounded transition-colors cursor-pointer"
+                         onClick={() => handleFriendClick(friend)} // Call handler on click
+                         role="button"
+                         tabIndex={0}
+                         aria-label={`Open chat with ${friend.name}`}
+                         >
                         <div className="flex items-center gap-2 min-w-0">
                             <div className="relative flex-shrink-0">
                                 <Avatar className="h-8 w-8">
@@ -355,16 +350,20 @@ export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
                             </div>
                             <span className="text-sm font-medium truncate">{friend.name}</span>
                         </div>
-                         <Badge
-                            variant={friend.status === 'online' ? 'secondary' : friend.status === 'ingame' ? 'default' : 'outline'}
-                            className={cn(
-                                "h-5 px-1.5 text-[10px] capitalize transition-colors flex-shrink-0",
-                                friend.status === 'online' && 'bg-green-500/10 text-green-600 border-green-500/20',
-                                friend.status === 'ingame' && 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                            )}
-                            >
-                            {friend.status}
-                         </Badge>
+                         {/* Keep status badge, but also add subtle message icon on hover */}
+                         <div className="flex items-center gap-1">
+                             <MessageCircle className="h-4 w-4 text-primary opacity-0 group-hover:opacity-70 transition-opacity" />
+                             <Badge
+                                variant={friend.status === 'online' ? 'secondary' : friend.status === 'ingame' ? 'default' : 'outline'}
+                                className={cn(
+                                    "h-5 px-1.5 text-[10px] capitalize transition-colors flex-shrink-0",
+                                    friend.status === 'online' && 'bg-green-500/10 text-green-600 border-green-500/20',
+                                    friend.status === 'ingame' && 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                )}
+                                >
+                                {friend.status}
+                             </Badge>
+                         </div>
                     </div>
                 ))}
                 {friends.length === 0 && !isLoading && (

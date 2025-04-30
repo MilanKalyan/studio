@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -17,6 +18,7 @@ import {
 import { GameLobbyContent } from './game-lobby-content';
 import { MySpaceContent } from './my-space-content';
 import { SettingsContent } from './settings-content';
+import type { ChatRoom } from './chat'; // Import ChatRoom type
 
 interface NavItemBase {
   id: string;
@@ -45,6 +47,8 @@ type NavSnapPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
 interface BottomNavigationProps {
   onLogout: () => void;
   initialSnapPosition?: NavSnapPosition; // Represents the corner the FAB snaps to
+  chatRooms: ChatRoom[]; // Pass chatRooms for MySpace
+  onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void; // Pass switch function for MySpace
 }
 
 // Styles based on snap position, mostly for menu expansion and tooltip
@@ -62,7 +66,12 @@ const MENU_ITEM_SIZE = 48; // Approx size of menu items (w-12 h-12 = 48px)
 const MENU_GAP = 12; // Gap between menu items (gap-3)
 
 
-export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }: BottomNavigationProps) { // Changed default to 'top-right'
+export function BottomNavigation({
+    onLogout,
+    initialSnapPosition = 'top-right',
+    chatRooms, // Destructure chatRooms
+    onSwitchChat // Destructure onSwitchChat
+}: BottomNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [openSheet, setOpenSheet] = useState<string | null>(null);
@@ -81,9 +90,10 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
   const [hasMounted, setHasMounted] = useState(false); // Track client-side mount
 
   // Define nav items inside the component
+  // Pass chatRooms and onSwitchChat to MySpace sheetProps
   const navItems: NavItem[] = [
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/' },
-    { id: 'myspace', label: 'My Space', icon: LayoutGrid, isSheet: true, sheetContent: MySpaceContent, sheetTitle: 'My Space' },
+    { id: 'myspace', label: 'My Space', icon: LayoutGrid, isSheet: true, sheetContent: MySpaceContent, sheetTitle: 'My Space', sheetProps: { chatRooms, onSwitchChat } },
     { id: 'games', label: 'Games', icon: Gamepad2, isSheet: true, sheetContent: GameLobbyContent, sheetTitle: 'Game Lobby' },
     { id: 'browse', label: 'Browse', icon: Compass, path: '/browse' },
     { id: 'settings', label: 'Settings', icon: Settings, isSheet: true, sheetContent: (props) => <SettingsContent {...props} setNavPosition={setSnapPosition} currentNavPosition={snapPosition} />, sheetProps: { onLogout }, sheetTitle: 'Settings' },
@@ -289,6 +299,10 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
 
   const handleSheetOpenChange = (itemId: string, isOpen: boolean) => {
     setOpenSheet(isOpen ? itemId : null);
+    // Close the main nav when opening a sheet
+    if (isOpen) {
+      setIsNavOpen(false);
+    }
   };
 
   const toggleNav = () => {
@@ -451,6 +465,7 @@ export function BottomNavigation({ onLogout, initialSnapPosition = 'top-right' }
                             <SheetTitle className="text-center text-lg">{item.sheetTitle}</SheetTitle>
                         </SheetHeader>
                         <div className="flex-1 overflow-y-auto pt-2 pb-4">
+                            {/* Pass props (including chatRooms, onSwitchChat for MySpace) */}
                             <SheetContentComponent {...item.sheetProps} />
                         </div>
                     </SheetContent>

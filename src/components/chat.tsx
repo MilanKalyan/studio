@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare, PlusCircle, Search, UserCheck, Hash, User, ChevronsUpDown } from 'lucide-react'; // Added Hash, User, ChevronsUpDown
+import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare, PlusCircle, Search, UserCheck, Hash, User, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -35,7 +35,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-interface Message {
+export interface Message {
   id: string;
   sender: string;
   text: string;
@@ -44,7 +44,7 @@ interface Message {
 }
 
 // Placeholder Player type
-interface Player {
+export interface Player { // Exporting for use in MySpaceContent
     id: string;
     name: string;
     avatar: string;
@@ -62,7 +62,7 @@ const placeholderFriends: Player[] = [
 ];
 
 // Placeholder Chat Room type
-export interface ChatRoom { // Exporting for use in MySpaceContent
+export interface ChatRoom {
     id: string;
     name: string;
     type: 'group' | 'dm';
@@ -72,73 +72,54 @@ export interface ChatRoom { // Exporting for use in MySpaceContent
     lastMessageTime?: number;
 }
 
-// Moved initialMessages declaration here, before it's used in globalChat
-const initialMessages: Message[] = [
-    { id: '1', sender: 'Alice', text: 'Hey Bob!', timestamp: Date.now() - 600000, avatar: 'https://picsum.photos/seed/alice/40/40' },
-    { id: '2', sender: 'Bob', text: 'Hi Alice! What\'s up?', timestamp: Date.now() - 540000, avatar: 'https://picsum.photos/seed/bob/40/40' },
-    { id: '3', sender: 'Alice', text: 'Not much, just checking out Kinect. Pretty cool!', timestamp: Date.now() - 480000, avatar: 'https://picsum.photos/seed/alice/40/40' },
-    { id: '4', sender: 'Alice', text: 'Wanna play Tic Tac Toe later?', timestamp: Date.now() - 470000, avatar: 'https://picsum.photos/seed/alice/40/40' },
-    { id: '5', sender: 'Bob', text: 'Sure, sounds fun! I\'m up for a game.', timestamp: Date.now() - 420000, avatar: 'https://picsum.photos/seed/bob/40/40' },
-    { id: '6', sender: 'Alice', text: 'Great! Maybe around 8 PM?', timestamp: Date.now() - 360000, avatar: 'https://picsum.photos/seed/alice/40/40' },
-    { id: '7', sender: 'Bob', text: 'Works for me. Setting up the lobby then!', timestamp: Date.now() - 300000, avatar: 'https://picsum.photos/seed/bob/40/40' },
-    { id: '8', sender: 'Alice', text: 'Awesome! See you then. 😄', timestamp: Date.now() - 295000, avatar: 'https://picsum.photos/seed/alice/40/40' },
-    { id: '9', sender: 'Charlie', text: 'Hey everyone, what are we talking about?', timestamp: Date.now() - 180000, avatar: 'https://picsum.photos/seed/charlie/40/40' },
-    { id: '10', sender: 'Bob', text: 'Hey Charlie! Just planning a Tic Tac Toe game with Alice later.', timestamp: Date.now() - 120000, avatar: 'https://picsum.photos/seed/bob/40/40' },
-    { id: '11', sender: 'Charlie', text: 'Oh nice! Mind if I join? 👀', timestamp: Date.now() - 60000, avatar: 'https://picsum.photos/seed/charlie/40/40' },
-    { id: '12', sender: 'Alice', text: 'The more the merrier! But Tic Tac Toe is only 2 players... maybe Chess?', timestamp: Date.now() - 30000, avatar: 'https://picsum.photos/seed/alice/40/40' },
-    { id: '13', sender: 'Bob', text: 'Chess works! Let\'s do that.', timestamp: Date.now() - 10000, avatar: 'https://picsum.photos/seed/bob/40/40' },
-    { id: '14', sender: 'Charlie', text: 'Perfect! I\'ll bring my A-game. ♟️', timestamp: Date.now(), avatar: 'https://picsum.photos/seed/charlie/40/40' },
-];
-
-// Initial Global Chat
-const globalChat: ChatRoom = {
-    id: 'global',
-    name: 'Global Chat',
-    type: 'group',
-    participants: ['alice', 'bob', 'charlie', 'dave', 'eve', 'frank'], // Everyone initially
-    avatar: 'https://picsum.photos/seed/group/40/40',
-    lastMessage: 'Perfect! I\'ll bring my A-game. ♟️',
-    lastMessageTime: initialMessages[initialMessages.length - 1]?.timestamp ?? Date.now(),
-};
+// Define props for Chat component
+interface ChatProps {
+    chatRooms: ChatRoom[];
+    currentChat: ChatRoom | null; // Now nullable
+    messages: Message[];
+    isLoading: boolean;
+    currentUser: string;
+    currentUserId: string;
+    onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void;
+    onAddMessage: (newMessage: Message) => void;
+    onAddChatRoom: (newRoom: ChatRoom) => void;
+}
 
 
-export function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]); // Start with empty messages
+export function Chat({
+    chatRooms,
+    currentChat,
+    messages,
+    isLoading,
+    currentUser,
+    currentUserId,
+    onSwitchChat,
+    onAddMessage,
+    onAddChatRoom
+}: ChatProps) {
+  // Local state for the input field, sending status, etc.
   const [newMessage, setNewMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true); // Start in loading state
-  const [isSending, setIsSending] = useState(false); // State for sending message indicator
+  const [isSending, setIsSending] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null); // Ref for the viewport div
-  const currentUser = 'Bob'; // Simulate the current user
-  const currentUserId = 'bob'; // Simulate current user ID
   const [isAddRoomSheetOpen, setIsAddRoomSheetOpen] = useState(false);
-  const [friends, setFriends] = useState<Player[]>([]); // State for friends list
+  const [friends, setFriends] = useState<Player[]>([]); // State for friends list (still local to Chat for the sheet)
   const [filteredFriends, setFilteredFriends] = useState<Player[]>([]);
   const [friendSearchTerm, setFriendSearchTerm] = useState('');
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const { toast } = useToast();
   const [isCreatingChat, setIsCreatingChat] = useState(false);
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([globalChat]); // State to hold all chat rooms
-  const [currentChat, setCurrentChat] = useState<ChatRoom>(globalChat); // State for the currently viewed chat
 
-
-  // --- Client-Side Mounting & Initial Load ---
+  // --- Client-Side Mounting & Initial Friend Load ---
   useEffect(() => {
     setIsClient(true);
-    // Simulate fetching initial messages & friends
+    // Simulate fetching initial friends (still needed for the 'Add Room' sheet)
     const timer = setTimeout(() => {
-        // Load messages for the default chat (Global Chat)
-        setMessages(initialMessages);
-        setFriends(placeholderFriends); // Load placeholder friends
-        setFilteredFriends(placeholderFriends); // Initialize filtered list
-        setIsLoading(false);
-        // Scroll to bottom after initial load
-        requestAnimationFrame(() => {
-            setTimeout(() => scrollToBottom('instant'), 50);
-        });
-    }, 1000); // Simulate 1s loading delay
+        setFriends(placeholderFriends);
+        setFilteredFriends(placeholderFriends);
+    }, 500); // Shorter delay as main data comes from props
 
     return () => clearTimeout(timer); // Cleanup timer on unmount
   }, []);
@@ -169,30 +150,40 @@ export function Chat() {
       });
   }, []);
 
-   // Scroll smoothly when new messages are added by the current user or when messages load initially
+   // Scroll logic based on props changes
    useEffect(() => {
        if (!isLoading && messages.length > 0) {
+           // If the last message is from the current user, always scroll smoothly
            if (messages[messages.length - 1]?.sender === currentUser) {
                scrollToBottom('smooth');
            } else {
+               // If receiving a message from others, only scroll if near the bottom
                const viewport = viewportRef.current;
                if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
                  scrollToBottom('smooth');
                }
            }
        }
-       // If switching chats and messages become empty, ensure view is scrolled to top/start
+       // If switching chats and messages become empty or loading finishes with empty messages, scroll to top
        else if (!isLoading && messages.length === 0 && viewportRef.current) {
             viewportRef.current.scrollTo({ top: 0, behavior: 'instant' });
        }
    }, [messages, currentUser, scrollToBottom, isLoading]);
+
+   // Scroll instantly when currentChat changes (switching chats)
+   useEffect(() => {
+       if (currentChat && currentChat.id !== 'loading') {
+           scrollToBottom('instant');
+       }
+   }, [currentChat, scrollToBottom]);
 
 
   // --- Message Sending Logic ---
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = newMessage.trim();
-    if (!trimmedMessage || isSending || currentChat.id === 'loading') return; // Prevent sending empty, duplicate or while loading
+    // Check currentChat exists and is not the loading placeholder
+    if (!currentChat || currentChat.id === 'loading' || !trimmedMessage || isSending) return;
 
     setIsSending(true);
     const tempId = `temp-${Date.now()}`;
@@ -202,36 +193,22 @@ export function Chat() {
       sender: currentUser,
       text: trimmedMessage,
       timestamp: Date.now(),
-      avatar: 'https://picsum.photos/seed/bob/40/40',
+      avatar: 'https://picsum.photos/seed/bob/40/40', // Current user's avatar
     };
 
-     // Simulate API call to send message (would target currentChat.id)
-     console.log(`Sending to chat ${currentChat.id}:`, messageData);
-     // Optimistic UI update *only if in the correct chat*
-     // In a real app, WS would push the update
-     // Find the chat room and update its last message details
-     setChatRooms(prev => prev.map(room => {
-         if (room.id === currentChat.id) {
-             return {
-                 ...room,
-                 lastMessage: trimmedMessage,
-                 lastMessageTime: messageData.timestamp,
-             };
-         }
-         return room;
-     }));
+     // Call the onAddMessage prop function to update state in Home component
+     onAddMessage(messageData);
 
-     setMessages(prevMessages => [...prevMessages, messageData]);
-     scrollToBottom('smooth'); // Scroll after optimistic update
-
+     // Clear input and scroll (optimistic update handled by state change)
      setNewMessage('');
+     // scrollToBottom('smooth'); // Let the useEffect handle scrolling
 
+     // Simulate API call delay
+     await new Promise(resolve => setTimeout(resolve, 500));
+     setIsSending(false);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setIsSending(false);
-
-     // Simulate a reply only in Global Chat for demo
-     if (currentChat.id === globalChat.id) {
+     // Simulate a reply only in Global Chat for demo (keep this local if desired)
+     if (currentChat.id === 'global') { // Use 'global' id consistently
          setTimeout(() => {
              const replyMessage: Message = {
                  id: String(Date.now()),
@@ -240,22 +217,9 @@ export function Chat() {
                  timestamp: Date.now(),
                  avatar: 'https://picsum.photos/seed/alice/40/40',
              };
-             setMessages(prevMessages => [...prevMessages, replyMessage]);
-             // Update global chat last message again
-             setChatRooms(prev => prev.map(room => {
-                if (room.id === globalChat.id) {
-                    return {
-                        ...room,
-                        lastMessage: replyMessage.text,
-                        lastMessageTime: replyMessage.timestamp,
-                    };
-                }
-                return room;
-            }));
-             const viewport = viewportRef.current;
-             if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
-                scrollToBottom('smooth');
-             }
+             // Use onAddMessage for replies too, ensuring state consistency
+             onAddMessage(replyMessage);
+             // Scroll handled by useEffect
          }, 1500);
      }
   };
@@ -298,12 +262,13 @@ export function Chat() {
             toast({ title: "Group Chat Created", description: `Started group: ${newChat.name}` });
        } else {
            const friend = selectedFriendDetails[0];
-            // Check if DM already exists
-            const existingDmId = `dm-${[currentUserId, friend.id].sort().join('-')}`; // Create consistent sorted ID
+           const existingDmId = `dm-${[currentUserId, friend.id].sort().join('-')}`; // Create consistent sorted ID
+
+           // Check if DM already exists using the chatRooms prop
             const existingDm = chatRooms.find(room => room.id === existingDmId);
             if (existingDm) {
                 toast({ variant: "default", title: "Chat Exists", description: `Chat with ${friend.name} already exists.` });
-                handleSwitchChat(existingDm.id); // Switch to existing DM
+                onSwitchChat(existingDm.id); // Use prop to switch chat
                 setIsCreatingChat(false);
                 setIsAddRoomSheetOpen(false);
                 setSelectedFriends([]);
@@ -322,9 +287,8 @@ export function Chat() {
             toast({ title: "Direct Chat Started", description: `Chat with ${newChat.name} created.` });
        }
 
-        // Add to chat list and switch to the new chat
-        setChatRooms(prev => [...prev, newChat]);
-        handleSwitchChat(newChat.id); // Switch to the newly created chat
+        // Use the onAddChatRoom prop to add the new chat room to the state in Home
+        onAddChatRoom(newChat);
 
         // Reset form and close sheet
         setIsCreatingChat(false);
@@ -332,47 +296,11 @@ export function Chat() {
         setSelectedFriends([]);
         setGroupName('');
         setFriendSearchTerm('');
-
-       // TODO: Update MySpace with the new group/chat link
-       // This would likely involve a shared state or context/props drilling
-       // For now, just log it.
-       console.log("New chat created, ID:", newChat.id, "Should update MySpace.");
    };
 
-   // --- Chat Switching Logic ---
-    const handleSwitchChat = (chatId: string) => {
-        if (chatId === currentChat.id || chatId === 'loading') return;
 
-        const targetChat = chatRooms.find(room => room.id === chatId);
-        if (!targetChat) return;
-
-        console.log(`Switching to chat: ${targetChat.name} (ID: ${chatId})`);
-
-        // Set loading state for messages
-        setIsLoading(true);
-        setCurrentChat({ id: 'loading', name: 'Loading...', type: 'group', participants: [] }); // Temporary loading state
-        setMessages([]); // Clear previous messages
-
-        // Simulate fetching messages for the new chat
-        setTimeout(() => {
-            setCurrentChat(targetChat);
-            if (targetChat.id === globalChat.id) {
-                setMessages(initialMessages); // Load global messages
-            } else {
-                // Simulate empty chat for newly created DMs/Groups
-                 setMessages([]); // Empty messages for other chats in this demo
-                 // In a real app, fetch messages for targetChat.id here
-            }
-            setIsLoading(false);
-            // Scroll to bottom (or top if empty) after switching
-            requestAnimationFrame(() => {
-                setTimeout(() => scrollToBottom('instant'), 50); // Instant scroll on switch
-            });
-        }, 500); // Simulate network delay for switching
-    };
-
-   // Get display details for the current chat
-   const currentChatDisplay = currentChat.id === 'loading' ? {
+   // Get display details for the current chat using the currentChat prop
+   const currentChatDisplay = !currentChat || currentChat.id === 'loading' ? {
        name: 'Loading...',
        avatar: '',
        fallback: 'L',
@@ -396,7 +324,7 @@ export function Chat() {
         {/* Chat Switcher Dropdown */}
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring">
+                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring" disabled={!currentChat}>
                     <div className="relative">
                         <Avatar className={cn("h-8 w-8 border-2", currentChatDisplay.isOnline ? "border-green-500/70" : "border-border/50")}>
                             <AvatarImage src={currentChatDisplay.avatar} alt={currentChatDisplay.name} />
@@ -416,44 +344,26 @@ export function Chat() {
                 <DropdownMenuLabel>Chats</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                  <DropdownMenuGroup>
-                     {/* Global Chat Always First */}
-                     <DropdownMenuItem
-                        key={globalChat.id}
-                        onSelect={() => handleSwitchChat(globalChat.id)}
-                        className={cn("flex items-center gap-2 cursor-pointer", currentChat.id === globalChat.id && "bg-accent")}
-                      >
-                        <Hash className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate">{globalChat.name}</span>
-                     </DropdownMenuItem>
-
-                     {/* DMs */}
-                     {chatRooms.filter(room => room.type === 'dm').map(room => (
+                     {/* Use chatRooms prop */}
+                     {chatRooms.map(room => (
                          <DropdownMenuItem
                             key={room.id}
-                            onSelect={() => handleSwitchChat(room.id)}
-                            className={cn("flex items-center gap-2 cursor-pointer", currentChat.id === room.id && "bg-accent")}
+                            onSelect={() => onSwitchChat(room.id)} // Use onSwitchChat prop
+                            className={cn(
+                                "flex items-center gap-2 cursor-pointer",
+                                currentChat?.id === room.id && "bg-accent" // Use currentChat prop
+                            )}
                           >
-                              <Avatar className="h-5 w-5">
-                                  <AvatarImage src={room.avatar} alt={room.name} />
-                                  <AvatarFallback>{room.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
+                            {room.type === 'group' ? (
+                                <Hash className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <Avatar className="h-5 w-5">
+                                    <AvatarImage src={room.avatar} alt={room.name} />
+                                    <AvatarFallback>{room.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                            )}
                             <span className="truncate">{room.name}</span>
                          </DropdownMenuItem>
-                     ))}
-
-                     {/* Groups */}
-                     {chatRooms.filter(room => room.type === 'group' && room.id !== globalChat.id).map(room => (
-                          <DropdownMenuItem
-                            key={room.id}
-                            onSelect={() => handleSwitchChat(room.id)}
-                            className={cn("flex items-center gap-2 cursor-pointer", currentChat.id === room.id && "bg-accent")}
-                          >
-                            <Avatar className="h-5 w-5">
-                                <AvatarImage src={room.avatar} alt={room.name} />
-                                <AvatarFallback>#</AvatarFallback>
-                            </Avatar>
-                            <span className="truncate">{room.name}</span>
-                          </DropdownMenuItem>
                      ))}
                 </DropdownMenuGroup>
                  <DropdownMenuSeparator />
@@ -572,12 +482,12 @@ export function Chat() {
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="View Chat Members" className="text-muted-foreground hover:text-foreground">
-                                {currentChat.type === 'group' ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                            <Button variant="ghost" size="icon" aria-label="View Chat Members" className="text-muted-foreground hover:text-foreground" disabled={!currentChat || isLoading}>
+                                {currentChat?.type === 'group' ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            {currentChat.type === 'group' ? `View Members (${currentChat.participants.length})` : `View Profile`}
+                            {currentChat?.type === 'group' ? `View Members (${currentChat.participants.length})` : `View Profile`}
                         </TooltipContent>
                     </Tooltip>
                 </div>
@@ -618,11 +528,11 @@ export function Chat() {
                         <MessageSquare className="h-12 w-12 mb-4 opacity-50" />
                         <p className="text-lg font-medium">No messages yet</p>
                         <p className="text-sm">
-                           {currentChat.type === 'dm' ? `Start chatting with ${currentChat.name}!` : `Start the conversation in ${currentChat.name}!`}
+                           {currentChat?.type === 'dm' ? `Start chatting with ${currentChat.name}!` : currentChat ? `Start the conversation in ${currentChat.name}!` : 'Select a chat to begin.'}
                         </p>
                     </div>
                  ) : (
-                    // Actual Messages
+                    // Actual Messages (using messages prop)
                     messages.map((msg, index) => {
                       const isCurrentUser = msg.sender === currentUser;
                       const showAvatar = !isCurrentUser && (index === 0 || messages[index - 1]?.sender !== msg.sender);
@@ -660,7 +570,7 @@ export function Chat() {
                                 (!showAvatar && index > 0 && messages[index-1].sender === msg.sender) ? 'mt-1' : 'mt-0'
                               )}
                             >
-                                {showAvatar && !isCurrentUser && currentChat.type === 'group' && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
+                                {showAvatar && !isCurrentUser && currentChat?.type === 'group' && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
                                 <p className="leading-snug break-words">{msg.text}</p>
                                 {isClient && (
                                     <span className={cn(
@@ -687,7 +597,7 @@ export function Chat() {
              <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-1 sm:space-x-2">
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground">
+                        <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
                             <Smile className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -695,7 +605,7 @@ export function Chat() {
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file" className="text-muted-foreground hover:text-accent-foreground">
+                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file" className="text-muted-foreground hover:text-accent-foreground" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
                             <Paperclip className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -703,7 +613,7 @@ export function Chat() {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="AI Assistant" className="text-muted-foreground hover:text-accent-foreground">
+                        <Button variant="ghost" size="icon" type="button" aria-label="AI Assistant" className="text-muted-foreground hover:text-accent-foreground" disabled={isLoading || !currentChat || currentChat.id === 'loading'}>
                             <Bot className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -712,18 +622,18 @@ export function Chat() {
 
                 <Input
                     type="text"
-                    placeholder="Type a message..."
+                    placeholder={currentChat ? "Type a message..." : "Select a chat"}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     className="flex-1 bg-muted/50 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200"
                     aria-label="Chat message input"
-                    disabled={isSending || isLoading || currentChat.id === 'loading'} // Disable while sending or loading chats
+                    disabled={isSending || isLoading || !currentChat || currentChat.id === 'loading'} // Disable while sending or loading chats or if no chat selected
                     autoComplete="off"
                 />
 
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0" aria-label="Send message" disabled={isSending || !newMessage.trim() || isLoading || currentChat.id === 'loading'}>
+                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0" aria-label="Send message" disabled={isSending || !newMessage.trim() || isLoading || !currentChat || currentChat.id === 'loading'}>
                              {isSending ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
                              ) : (
