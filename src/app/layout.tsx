@@ -1,17 +1,20 @@
 import type { Metadata } from 'next';
-import { GeistSans } from 'geist/font/sans'; // Correct import for Geist Sans
-import { GeistMono } from 'geist/font/mono'; // Correct import for Geist Mono
+import { Suspense } from 'react'; // Import Suspense
+import { GeistSans } from 'geist/font/sans';
+// Assuming GeistMono is correctly installed or removed if not used
+// import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { cn } from '@/lib/utils';
-import { Toaster } from '@/components/ui/toaster'; // Import Toaster
-import { BottomNavigation } from '@/components/bottom-navigation'; // Import BottomNavigation
+import { Toaster } from '@/components/ui/toaster';
+import { BottomNavigation } from '@/components/bottom-navigation';
+import Loading from './loading'; // Import the loading component
 
 // Define font variables
 const fontSansVariable = GeistSans.variable;
-const fontMonoVariable = GeistMono.variable;
+// const fontMonoVariable = GeistMono.variable; // Remove if not used
 
 export const metadata: Metadata = {
-  title: 'Kinect', // Updated title
+  title: 'Kinect',
   description: 'Chat, play games, and connect.',
 };
 
@@ -21,14 +24,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("dark", fontSansVariable, fontMonoVariable)}>
+    // Apply dark theme directly to html tag
+    <html lang="en" className={cn("dark", fontSansVariable /*, fontMonoVariable*/)}>
       <body
         className={cn(
-          'antialiased font-sans transition-colors duration-300 flex flex-col min-h-screen' // Ensure body takes full height and uses flex column
+          'antialiased font-sans transition-colors duration-300 flex flex-col min-h-screen bg-background text-foreground' // Ensure body has background/text colors
         )}
       >
-        <main className="flex-1 overflow-y-auto">{children}</main> {/* Main content area */}
-        <BottomNavigation /> {/* Add BottomNavigation */}
+         {/* Wrap children with Suspense for route loading states */}
+         <Suspense fallback={<Loading />}>
+            <main className="flex-1 overflow-y-auto">{children}</main>
+         </Suspense>
+        {/* Conditionally render BottomNavigation? Or handle auth state within components */}
+        {/* For now, assume it shows if logged in, which page.tsx handles */}
+        {/* <BottomNavigation /> */}
         <Toaster />
       </body>
     </html>
