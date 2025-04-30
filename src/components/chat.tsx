@@ -72,18 +72,7 @@ export interface ChatRoom { // Exporting for use in MySpaceContent
     lastMessageTime?: number;
 }
 
-// Initial Global Chat
-const globalChat: ChatRoom = {
-    id: 'global',
-    name: 'Global Chat',
-    type: 'group',
-    participants: ['alice', 'bob', 'charlie', 'dave', 'eve', 'frank'], // Everyone initially
-    avatar: 'https://picsum.photos/seed/group/40/40',
-    lastMessage: 'Perfect! I\'ll bring my A-game. ♟️',
-    lastMessageTime: initialMessages[initialMessages.length - 1]?.timestamp ?? Date.now(),
-};
-
-// Keep initialMessages for initial load simulation
+// Moved initialMessages declaration here, before it's used in globalChat
 const initialMessages: Message[] = [
     { id: '1', sender: 'Alice', text: 'Hey Bob!', timestamp: Date.now() - 600000, avatar: 'https://picsum.photos/seed/alice/40/40' },
     { id: '2', sender: 'Bob', text: 'Hi Alice! What\'s up?', timestamp: Date.now() - 540000, avatar: 'https://picsum.photos/seed/bob/40/40' },
@@ -100,6 +89,17 @@ const initialMessages: Message[] = [
     { id: '13', sender: 'Bob', text: 'Chess works! Let\'s do that.', timestamp: Date.now() - 10000, avatar: 'https://picsum.photos/seed/bob/40/40' },
     { id: '14', sender: 'Charlie', text: 'Perfect! I\'ll bring my A-game. ♟️', timestamp: Date.now(), avatar: 'https://picsum.photos/seed/charlie/40/40' },
 ];
+
+// Initial Global Chat
+const globalChat: ChatRoom = {
+    id: 'global',
+    name: 'Global Chat',
+    type: 'group',
+    participants: ['alice', 'bob', 'charlie', 'dave', 'eve', 'frank'], // Everyone initially
+    avatar: 'https://picsum.photos/seed/group/40/40',
+    lastMessage: 'Perfect! I\'ll bring my A-game. ♟️',
+    lastMessageTime: initialMessages[initialMessages.length - 1]?.timestamp ?? Date.now(),
+};
 
 
 export function Chat() {
@@ -209,14 +209,20 @@ export function Chat() {
      console.log(`Sending to chat ${currentChat.id}:`, messageData);
      // Optimistic UI update *only if in the correct chat*
      // In a real app, WS would push the update
-     if (currentChat.id === globalChat.id) { // For demo, only update Global Chat optimistically
-        setMessages(prevMessages => [...prevMessages, messageData]);
-        scrollToBottom('smooth'); // Scroll after optimistic update
-     } else {
-         // If not in global chat, just show sending state and maybe clear input
-         // In real app, send to backend, rely on WS/refetch for update
-          toast({ title: "Message Sent", description: `To: ${currentChat.name}` });
-     }
+     // Find the chat room and update its last message details
+     setChatRooms(prev => prev.map(room => {
+         if (room.id === currentChat.id) {
+             return {
+                 ...room,
+                 lastMessage: trimmedMessage,
+                 lastMessageTime: messageData.timestamp,
+             };
+         }
+         return room;
+     }));
+
+     setMessages(prevMessages => [...prevMessages, messageData]);
+     scrollToBottom('smooth'); // Scroll after optimistic update
 
      setNewMessage('');
 
@@ -235,6 +241,17 @@ export function Chat() {
                  avatar: 'https://picsum.photos/seed/alice/40/40',
              };
              setMessages(prevMessages => [...prevMessages, replyMessage]);
+             // Update global chat last message again
+             setChatRooms(prev => prev.map(room => {
+                if (room.id === globalChat.id) {
+                    return {
+                        ...room,
+                        lastMessage: replyMessage.text,
+                        lastMessageTime: replyMessage.timestamp,
+                    };
+                }
+                return room;
+            }));
              const viewport = viewportRef.current;
              if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150) {
                 scrollToBottom('smooth');
@@ -281,8 +298,22 @@ export function Chat() {
             toast({ title: "Group Chat Created", description: `Started group: ${newChat.name}` });
        } else {
            const friend = selectedFriendDetails[0];
+            // Check if DM already exists
+            const existingDmId = `dm-${[currentUserId, friend.id].sort().join('-')}`; // Create consistent sorted ID
+            const existingDm = chatRooms.find(room => room.id === existingDmId);
+            if (existingDm) {
+                toast({ variant: "default", title: "Chat Exists", description: `Chat with ${friend.name} already exists.` });
+                handleSwitchChat(existingDm.id); // Switch to existing DM
+                setIsCreatingChat(false);
+                setIsAddRoomSheetOpen(false);
+                setSelectedFriends([]);
+                setGroupName('');
+                setFriendSearchTerm('');
+                return; // Stop creation process
+            }
+
             newChat = {
-                id: `dm-${friend.id}-${currentUserId}`, // Consistent DM ID (order might matter in real app)
+                id: existingDmId, // Use the consistent sorted ID
                 name: friend.name, // DM name is the friend's name
                 type: 'dm',
                 participants: participantIds,
@@ -335,7 +366,7 @@ export function Chat() {
             setIsLoading(false);
             // Scroll to bottom (or top if empty) after switching
             requestAnimationFrame(() => {
-                setTimeout(() => scrollToBottom(messages.length > 0 ? 'instant' : 'instant'), 50); // Instant scroll on switch
+                setTimeout(() => scrollToBottom('instant'), 50); // Instant scroll on switch
             });
         }, 500); // Simulate network delay for switching
     };

@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { ChatRoom } from './chat'; // Import ChatRoom type
+import { formatDistanceToNow } from 'date-fns'; // Import for relative time
 
 // Placeholder data - replace with actual user data fetching
 const placeholderRecentActivities = [
@@ -46,14 +47,28 @@ const placeholderFriends: Player[] = [
      { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline', kinectId: 'KINECT#7890'},
 ];
 
+// Define initial Global Chat for demonstration
+const initialGlobalChat: ChatRoom = {
+    id: 'global',
+    name: 'Global Chat',
+    type: 'group',
+    participants: ['alice', 'bob', 'charlie', 'dave', 'eve', 'frank'],
+    avatar: 'https://picsum.photos/seed/group/40/40',
+    lastMessage: 'Perfect! I\'ll bring my A-game. ♟️',
+    lastMessageTime: Date.now(), // Simplified for demo
+};
+
+
 // Props for MySpaceContent
 interface MySpaceContentProps {
-    // Add props as needed, e.g., function to switch chat in the main Chat component
-    // onSwitchChat?: (chatId: string) => void;
-    // chatRooms?: ChatRoom[]; // Pass chat rooms list if needed here
+    // Function to switch chat in the main Chat component
+    onSwitchChat?: (chatId: string) => void;
+    // Pass chat rooms list (needs to be managed outside and passed in)
+    // For demo, we'll use a local state initialized with global chat
+    // chatRooms: ChatRoom[];
 }
 
-export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceContentProps) {
+export function MySpaceContent({ onSwitchChat }: MySpaceContentProps) {
   const { toast } = useToast();
   const [friendIdInput, setFriendIdInput] = useState('');
   const [isAddingFriend, setIsAddingFriend] = useState(false);
@@ -61,7 +76,10 @@ export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceCo
   const [recentActivities, setRecentActivities] = useState<typeof placeholderRecentActivities>([]);
   const [favoriteGames, setFavoriteGames] = useState<typeof placeholderFavoriteGames>([]);
   const [friends, setFriends] = useState<typeof placeholderFriends>([]);
-   const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  // Local state for chat rooms, initialized with global chat.
+  // In a real app, this would likely come from props or a shared context.
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([initialGlobalChat]);
 
 
   useEffect(() => {
@@ -71,6 +89,12 @@ export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceCo
           setRecentActivities(placeholderRecentActivities);
           setFavoriteGames(placeholderFavoriteGames);
           setFriends(placeholderFriends);
+          // Simulate adding a DM and another group chat after load for demonstration
+          setChatRooms(prev => [
+              ...prev,
+               { id: `dm-alice-bob`, name: 'Alice', type: 'dm', participants: ['bob', 'alice'], avatar: 'https://picsum.photos/seed/alice/40/40', lastMessage: 'Awesome! See you then. 😄', lastMessageTime: Date.now() - 300000 },
+               { id: `group-chess-club`, name: 'Chess Club', type: 'group', participants: ['bob', 'alice', 'charlie'], avatar: 'https://picsum.photos/seed/chessclub/40/40', lastMessage: 'Bob: Chess works! Let\'s do that.', lastMessageTime: Date.now() - 15000 },
+          ]);
           setIsLoading(false);
       }, 800); // Simulate loading delay
 
@@ -91,8 +115,9 @@ export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceCo
          setFriendIdInput('');
          return;
      }
-     // Check if adding self
-      if (trimmedId === "KINECT#5555") { // Assuming current user ID is KINECT#5555
+     // Check if adding self (assuming current user's placeholder ID)
+      const currentUserKinectId = "KINECT#BOBSID"; // Placeholder for current user
+      if (trimmedId === currentUserKinectId) {
           toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a friend." });
           return;
       }
@@ -104,31 +129,39 @@ export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceCo
 
      // Simulate success/failure
      const success = Math.random() > 0.3; // 70% success rate
-     const foundUser = placeholderFriends.find(p => p.kinectId === trimmedId); // Simulate finding user
+     // Try to find a user from the placeholder list *not already friends*
+     const potentialFriend = placeholderFriends.find(p => p.kinectId === trimmedId && !friends.some(f => f.id === p.id));
 
-     if (success && foundUser) {
-         // Simulate adding friend locally (in real app, backend handles this)
-          setFriends(prev => [...prev, { ...foundUser, status: Math.random() > 0.5 ? 'online' : 'offline' }]); // Add found user with random status
-         toast({ title: "Friend Request Sent", description: `Friend request sent to ${foundUser.name} (${trimmedId}).` });
+     if (success && potentialFriend) {
+         // Simulate adding friend locally
+          setFriends(prev => [...prev, { ...potentialFriend, status: Math.random() > 0.5 ? 'online' : 'offline' }]); // Add found user with random status
+         toast({ title: "Friend Request Sent", description: `Friend request sent to ${potentialFriend.name} (${trimmedId}).` });
          setFriendIdInput('');
      } else {
-         toast({ variant: "destructive", title: "Friend Not Found", description: `Could not find a user with ID ${trimmedId}.` });
+         toast({ variant: "destructive", title: "Friend Not Found", description: `Could not find a user with ID ${trimmedId} or request failed.` });
      }
      setIsAddingFriend(false);
    };
 
-    // Placeholder function to handle clicking on a chat
+    // Function to handle clicking on a chat
     const handleChatClick = (chatId: string) => {
         console.log("Clicked chat:", chatId);
         // If onSwitchChat prop exists, call it
-        // onSwitchChat?.(chatId);
-        toast({ title: "Switching Chat (Placeholder)", description: `Would switch to chat ID: ${chatId}`, duration: 2000 });
+        if (onSwitchChat) {
+            onSwitchChat(chatId);
+            // Maybe close the sheet after switching? Depends on UX.
+        } else {
+            toast({ title: "Switching Chat (Placeholder)", description: `Would switch to chat ID: ${chatId}`, duration: 2000 });
+        }
     };
+
+   // Sort chat rooms by last message time (most recent first)
+   const sortedChatRooms = [...chatRooms].sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
 
 
   return (
     <div className="space-y-6 p-4 pb-10">
-      {/* My Chats Section (New) */}
+      {/* My Chats Section */}
        <Card className={cn("animate-fade-in opacity-0 [--fade-in-delay:100ms]", isLoading && "opacity-100")}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-md font-semibold flex items-center gap-2">
@@ -150,42 +183,36 @@ export function MySpaceContent({ /* onSwitchChat, chatRooms = [] */ }: MySpaceCo
                         ))}
                     </div>
                 ) : (
-                    <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                        {/* Placeholder for Chat List - map through actual chatRooms prop later */}
-                        {/* Example Items: */}
-                        <div className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleChatClick('global')}>
-                            <Avatar className="h-8 w-8">
-                                <AvatarImage src="https://picsum.photos/seed/group/40/40" alt="Global Chat" />
-                                <AvatarFallback>G</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">Global Chat</p>
-                                <p className="text-xs text-muted-foreground truncate">Perfect! I'll bring my A-game. ♟️</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {sortedChatRooms.map(room => (
+                            <div
+                                key={room.id}
+                                className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                                onClick={() => handleChatClick(room.id)}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Open chat ${room.name}`}
+                            >
+                                <Avatar className="h-8 w-8 flex-shrink-0">
+                                    <AvatarImage src={room.avatar} alt={room.name} />
+                                    <AvatarFallback>{room.type === 'group' ? '#' : room.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-sm font-medium truncate">{room.name}</p>
+                                        {room.lastMessageTime && isClient && (
+                                            <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                                                {formatDistanceToNow(new Date(room.lastMessageTime), { addSuffix: true })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate">{room.lastMessage || 'No messages yet'}</p>
+                                </div>
                             </div>
-                        </div>
-                         <div className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleChatClick('dm-alice-bob')}>
-                            <Avatar className="h-8 w-8">
-                                <AvatarImage src="https://picsum.photos/seed/alice/40/40" alt="Alice" />
-                                <AvatarFallback>A</AvatarFallback>
-                            </Avatar>
-                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">Alice</p>
-                                <p className="text-xs text-muted-foreground truncate">Awesome! See you then. 😄</p>
-                             </div>
-                        </div>
-                         <div className="flex items-center gap-3 p-2 -mx-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleChatClick('group-chess-club')}>
-                            <Avatar className="h-8 w-8">
-                                <AvatarImage src="https://picsum.photos/seed/chessclub/40/40" alt="Chess Club" />
-                                <AvatarFallback>#</AvatarFallback>
-                            </Avatar>
-                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">Chess Club</p>
-                                <p className="text-xs text-muted-foreground truncate">Bob: Chess works! Let's do that.</p>
-                             </div>
-                        </div>
-                        {/* {chatRooms.length === 0 && !isLoading && ( // Check chatRooms prop later
-                           <p className="text-sm text-muted-foreground text-center py-4">No active chats.</p>
-                        )} */}
+                        ))}
+                        {sortedChatRooms.length === 0 && !isLoading && (
+                           <p className="text-sm text-muted-foreground text-center py-4">No active chats. Create one!</p>
+                        )}
                     </div>
                 )}
             </CardContent>
