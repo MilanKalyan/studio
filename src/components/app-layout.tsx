@@ -14,9 +14,9 @@ interface AppLayoutProps {
     isChatLoading: boolean;
     currentUser: string;
     currentUserId: string;
-    onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void;
+    onSwitchChat: (chatId: string, newChatDetails?: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => void; // Adjusted type
     // onAddMessage prop is removed
-    onAddChatRoom: (newRoom: ChatRoom) => void;
+    onAddChatRoom: (newRoom: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => Promise<void>; // Adjusted type
 }
 
 /**
@@ -54,7 +54,7 @@ export function AppLayout({
              currentUserId={currentUserId}
              onSwitchChat={onSwitchChat}
              // onAddMessage prop removed
-             onAddChatRoom={onAddChatRoom}
+             onAddChatRoom={onAddChatRoom} // Pass down the updated onAddChatRoom
           />
         </div>
         {/* Game Lobby Area - Takes full height within Card */}

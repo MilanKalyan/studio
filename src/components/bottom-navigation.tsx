@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -48,7 +47,7 @@ interface BottomNavigationProps {
   onLogout: () => void;
   initialSnapPosition?: NavSnapPosition; // Represents the corner the FAB snaps to
   chatRooms: ChatRoom[]; // Pass chatRooms for MySpace
-  onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void; // Pass switch function for MySpace
+  onSwitchChat: (chatId: string, newChatDetails?: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => void; // Updated type for newChatDetails
 }
 
 // Styles based on snap position, mostly for menu expansion and tooltip
@@ -325,6 +324,7 @@ export function BottomNavigation({
           gap: `${MENU_GAP}px`,
           transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
           zIndex: 50, // Below FAB (60)
+          pointerEvents: 'none', // Start as non-interactive
       };
 
       if (!isNavOpen) {
@@ -332,11 +332,10 @@ export function BottomNavigation({
           style.transform = snapPosition.includes('bottom')
               ? 'scale(0.95) translateY(10px)'
               : 'scale(0.95) translateY(-10px)';
-          style.pointerEvents = 'none';
       } else {
           style.opacity = 1;
           style.transform = 'scale(1) translateY(0)';
-          style.pointerEvents = 'auto';
+          style.pointerEvents = 'auto'; // Make interactive when open
       }
 
       const menuHeight = navItems.length * MENU_ITEM_SIZE + (navItems.length -1) * MENU_GAP;
@@ -387,7 +386,7 @@ export function BottomNavigation({
         <div
             ref={fabRef}
             className={cn(
-                "fixed z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms] rounded-full cursor-grab transition-all duration-300 ease-out", // Added transition for snap back
+                "fixed z-[60] animate-fade-in opacity-0 [--fade-in-delay:500ms] rounded-full cursor-grab transition-all duration-300 ease-out pointer-events-auto", // Added pointer-events-auto
                 isDragging && "scale-110 shadow-2xl", // Scale up and shadow during drag
             )}
             style={{
@@ -430,7 +429,7 @@ export function BottomNavigation({
             const buttonContent = <item.icon className="h-5 w-5" />;
 
             const commonButtonClasses = cn(
-                "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out",
+                "rounded-full w-12 h-12 shadow-md transition-all duration-200 ease-out pointer-events-auto", // Added pointer-events-auto
                 `delay-${index * 50}`, // Stagger animation (consider removing if menu animation is sufficient)
                  isNavOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90', // Individual item animation within menu
             );

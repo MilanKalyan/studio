@@ -47,7 +47,7 @@ const placeholderFriendsData: Player[] = [
 // Props for MySpaceContent - receives chatRooms and onSwitchChat from BottomNavigation -> Home
 interface MySpaceContentProps {
     chatRooms: ChatRoom[];
-    onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void; // Allow passing new chat details
+    onSwitchChat: (chatId: string, newChatDetails?: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => void; // Allow passing new chat details
 }
 
 export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps) {
@@ -143,13 +143,12 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
              onSwitchChat(dmId);
          } else {
              // If it doesn't exist, create the details and pass them to onSwitchChat
-             const newDmDetails: ChatRoom = {
+             const newDmDetails: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'> = { // Use Omit type
                  id: dmId,
                  name: friendDetails.name,
                  type: 'dm',
                  participants: [currentUserId, friendDetails.id],
                  avatar: friendDetails.avatar,
-                 // lastMessage and lastMessageTime will be updated when messages are sent
              };
              onSwitchChat(dmId, newDmDetails); // Pass the details to create and switch
          }
@@ -199,7 +198,7 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
                                     aria-label={`Open chat ${room.name}`}
                                 >
                                     <Avatar className="h-9 w-9 flex-shrink-0 border-2 border-border/50">
-                                        <AvatarImage src={room.avatar} alt={room.name} />
+                                        <AvatarImage src={room.avatar || ''} alt={room.name} />
                                         <AvatarFallback className="text-xs">{room.type === 'group' ? '#' : room.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1 min-w-0">

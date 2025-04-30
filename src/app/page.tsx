@@ -12,7 +12,7 @@ import type { ChatRoom, Message } from '@/components/chat'; // Import types
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase/config'; // Import Firestore instance
-import { collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, Timestamp, setDoc, doc } from 'firebase/firestore';
 
 // --- Initial Placeholder Data ---
 // Removed placeholder message generation and store
@@ -174,15 +174,14 @@ export default function Home() {
    };
 
    // --- Chat Management Logic ---
-    const handleSwitchChat = useCallback((chatId: string, newChatDetails?: ChatRoom) => {
+    const handleSwitchChat = useCallback(async (chatId: string, newChatDetails?: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => {
         if (authStatus === 'authenticated_needs_setup' || chatId === currentChat?.id || chatId === 'loading') return;
 
         let targetChat = chatRooms.find(room => room.id === chatId);
 
         if (!targetChat && newChatDetails) {
-             // Add new room optimistically (or fetch details if needed)
-             // For Firestore, you might just need the ID, Chat component handles message loading
-             const roomToAdd = {
+             // Add new room optimistically
+             const roomToAdd: ChatRoom = {
                  ...newChatDetails,
                  lastMessage: 'Chat created', // Initial placeholder
                  lastMessageTime: Date.now()
@@ -195,11 +194,25 @@ export default function Home() {
                  return updatedRooms;
              });
 
-             // No need to manage local placeholder messages store anymore
              toast({ title: "Chat Created", description: `Started chat with ${newChatDetails.name}` });
 
-             // Here, you might also want to create the chat document in Firestore
-             // if it doesn't exist, e.g., setDoc(doc(db, 'chats', newChatDetails.id), { participants: newChatDetails.participants, type: newChatDetails.type, name: newChatDetails.name });
+             // Create the chat document in Firestore
+             try {
+                const chatDocRef = doc(db, 'chats', newChatDetails.id);
+                await setDoc(chatDocRef, {
+                    participants: newChatDetails.participants,
+                    type: newChatDetails.type,
+                    name: newChatDetails.name,
+                    // Add other relevant fields if needed
+                });
+                console.log(`Firestore document created for chat: ${newChatDetails.id}`);
+             } catch (error) {
+                 console.error("Error creating Firestore chat document:", error);
+                 toast({ variant: "destructive", title: "Chat Creation Failed", description: "Could not save chat details." });
+                 // Optionally revert optimistic update
+                 setChatRooms(prev => prev.filter(room => room.id !== roomToAdd.id));
+                 return; // Prevent switching to the failed chat
+             }
 
         } else if (!targetChat) {
             toast({ variant: "destructive", title: "Chat Not Found" });
@@ -215,26 +228,47 @@ export default function Home() {
 
 
     // Function to add a new chat room (called from Chat component's sheet)
-    const addChatRoom = (newRoom: ChatRoom) => {
+    const addChatRoom = async (newRoomData: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => {
+        const newRoom: ChatRoom = {
+            ...newRoomData,
+            lastMessage: 'Chat created',
+            lastMessageTime: Date.now()
+        };
+
+        // Optimistic update
+        let roomAlreadyExists = false;
         setChatRooms(prev => {
             if (prev.some(room => room.id === newRoom.id)) {
-                handleSwitchChat(newRoom.id); // Switch if exists
-                return prev;
+                roomAlreadyExists = true;
+                return prev; // Don't add if it exists
             }
-             // Add the new room with placeholder last message info
-             const roomToAdd = {
-                 ...newRoom,
-                 lastMessage: 'Chat created',
-                 lastMessageTime: Date.now()
-             };
-             const updatedRooms = [...prev, roomToAdd].sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
+             const updatedRooms = [...prev, newRoom].sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
              return updatedRooms;
         });
-        // Switch to the newly created room after state update
-        handleSwitchChat(newRoom.id);
 
-        // Optionally create Firestore document for the chat room here
-        // e.g., setDoc(doc(db, 'chats', newRoom.id), { participants: newRoom.participants, type: newRoom.type, name: newRoom.name });
+        if (roomAlreadyExists) {
+             handleSwitchChat(newRoom.id); // Just switch if it existed
+             return;
+        }
+
+        // Create Firestore document for the chat room
+         try {
+            const chatDocRef = doc(db, 'chats', newRoom.id);
+            await setDoc(chatDocRef, {
+                participants: newRoom.participants,
+                type: newRoom.type,
+                name: newRoom.name,
+                createdAt: serverTimestamp(), // Add creation timestamp
+            });
+            console.log(`Firestore document created for chat: ${newRoom.id}`);
+             // Switch to the newly created room after state update and Firestore success
+             handleSwitchChat(newRoom.id);
+         } catch (error) {
+             console.error("Error creating Firestore chat document:", error);
+             toast({ variant: "destructive", title: "Chat Creation Failed", description: "Could not save chat details." });
+             // Revert optimistic update on error
+             setChatRooms(prev => prev.filter(room => room.id !== newRoom.id));
+         }
     };
 
 
@@ -258,25 +292,32 @@ export default function Home() {
    // Authenticated User - Render main app layout
    return (
      <div className="flex flex-col flex-1 h-full overflow-hidden">
-       <main className="flex-1 p-2 md:p-3 overflow-hidden relative">
-         <AppLayout
-             chatRooms={chatRooms}
-             currentChat={currentChat}
-             // messages prop removed
-             isChatLoading={isChatListLoading} // Pass overall loading state
-             currentUser={currentUser}
-             currentUserId={currentUserId}
-             onSwitchChat={handleSwitchChat}
-             // onAddMessage prop removed
-             onAddChatRoom={addChatRoom}
-          />
-       </main>
-       <BottomNavigation
-            onLogout={handleLogout}
-            chatRooms={chatRooms}
-            onSwitchChat={handleSwitchChat}
-            initialSnapPosition="top-right" // Set default position
-       />
+       {/* Use a wrapper div to contain main content and FAB, allowing main to scroll independently */}
+       <div className="flex-1 flex overflow-hidden relative">
+          <main className="flex-1 p-2 md:p-3 overflow-hidden">
+             <AppLayout
+                 chatRooms={chatRooms}
+                 currentChat={currentChat}
+                 // messages prop removed
+                 isChatLoading={isChatListLoading} // Pass overall loading state
+                 currentUser={currentUser}
+                 currentUserId={currentUserId}
+                 onSwitchChat={handleSwitchChat}
+                 // onAddMessage prop removed
+                 onAddChatRoom={addChatRoom}
+              />
+           </main>
+           {/* FAB Container - Absolutely positioned within the relative parent */}
+           <div className="absolute inset-0 pointer-events-none">
+                <BottomNavigation
+                    onLogout={handleLogout}
+                    chatRooms={chatRooms}
+                    onSwitchChat={handleSwitchChat}
+                    initialSnapPosition="top-right" // Set default position
+                />
+           </div>
+       </div>
+       <Toaster /> {/* Keep Toaster outside the main content scrolling area */}
      </div>
    );
 }

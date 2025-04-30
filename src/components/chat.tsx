@@ -376,7 +376,7 @@ export function Chat({
                              currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' ? "border-green-500/80" : "border-border/60",
                              (isChatLoading || currentChat?.id === 'loading') && "animate-pulse" // Use combined loading state
                          )}>
-                            <AvatarImage src={currentChatDisplay.avatar} alt={currentChatDisplay.name} />
+                            <AvatarImage src={currentChatDisplay.avatar || ''} alt={currentChatDisplay.name} />
                             <AvatarFallback className="text-sm">{currentChatDisplay.fallback}</AvatarFallback>
                         </Avatar>
                          {currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' && !(isChatLoading || currentChat?.id === 'loading') && (
@@ -573,7 +573,10 @@ export function Chat({
                                <div className={cn("flex flex-col gap-1", i % 2 === 0 ? 'items-start' : 'items-end')}>
                                    <Skeleton className={cn("h-4 w-20 rounded", i % 2 !== 0 && 'hidden')} />
                                    <Skeleton className={cn("h-10 rounded-lg", i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-32' : 'w-40')} />
-                                   <Skeleton className="h-3 w-10 mt-1 self-end rounded" />
+                                    {/* Skeleton for timestamp */}
+                                    <span className="text-xs opacity-60 mt-1 px-1 min-h-[1em]">
+                                         <Skeleton className="h-3 w-10 inline-block" />
+                                    </span>
                                </div>
                                {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 self-end" />}
                            </div>
@@ -653,8 +656,8 @@ export function Chat({
 
                                 {isClient && msg.createdAt && ( // Check if createdAt exists and isClient
                                     <span className={cn(
-                                        "text-[10px] opacity-0 mt-1 px-1 transition-opacity duration-300",
-                                        showTimestamp ? 'opacity-60' : 'h-[1em]',
+                                        "text-[10px] opacity-0 mt-1 px-1 transition-opacity duration-300 min-h-[1em]", // Added min-h-[1em]
+                                        showTimestamp ? 'opacity-60' : '', // Don't hide if not showing, keep space
                                         isCurrentUser ? 'self-end' : 'self-start'
                                     )}>
                                         {/* Format Firestore Timestamp */}
