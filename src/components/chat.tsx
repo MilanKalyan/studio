@@ -7,10 +7,23 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare } from 'lucide-react'; // Added Loader2 and MessageSquare
+import { SendHorizonal, Users, Paperclip, Bot, Smile, Loader2, MessageSquare, PlusCircle, Search, UserCheck } from 'lucide-react'; // Added Loader2, MessageSquare, PlusCircle, Search, UserCheck
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -20,6 +33,23 @@ interface Message {
   timestamp: number;
   avatar: string;
 }
+
+// Placeholder Player type (copied from my-space-content for now)
+interface Player {
+    id: string;
+    name: string;
+    avatar: string;
+    status: 'online' | 'offline' | 'ingame';
+}
+
+// Placeholder friends data (copied from my-space-content for now)
+const placeholderFriends: Player[] = [
+     { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online'},
+     { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline'},
+     { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame'},
+     { id: 'eve', name: 'Eve', avatar: 'https://picsum.photos/seed/eve/40/40', status: 'online'},
+     { id: 'frank', name: 'Frank', avatar: 'https://picsum.photos/seed/frank/40/40', status: 'offline'},
+];
 
 // Keep initialMessages for initial load simulation
 const initialMessages: Message[] = [
@@ -49,13 +79,24 @@ export function Chat() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null); // Ref for the viewport div
   const currentUser = 'Bob'; // Simulate the current user
+  const [isAddRoomSheetOpen, setIsAddRoomSheetOpen] = useState(false);
+  const [friends, setFriends] = useState<Player[]>([]); // State for friends list
+  const [filteredFriends, setFilteredFriends] = useState<Player[]>([]);
+  const [friendSearchTerm, setFriendSearchTerm] = useState('');
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState('');
+  const { toast } = useToast();
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+
 
   // --- Client-Side Mounting & Initial Load ---
   useEffect(() => {
     setIsClient(true);
-    // Simulate fetching initial messages
+    // Simulate fetching initial messages & friends
     const timer = setTimeout(() => {
         setMessages(initialMessages);
+        setFriends(placeholderFriends); // Load placeholder friends
+        setFilteredFriends(placeholderFriends); // Initialize filtered list
         setIsLoading(false);
         // Use 'instant' for the initial scroll after loading messages
         // Defer slightly to ensure layout is stable
@@ -66,6 +107,21 @@ export function Chat() {
 
     return () => clearTimeout(timer); // Cleanup timer on unmount
   }, []);
+
+  // --- Friend Search Logic ---
+   useEffect(() => {
+       if (!friendSearchTerm) {
+           setFilteredFriends(friends);
+           return;
+       }
+       const lowerCaseTerm = friendSearchTerm.toLowerCase();
+       setFilteredFriends(
+           friends.filter(friend =>
+               friend.name.toLowerCase().includes(lowerCaseTerm)
+           )
+       );
+   }, [friendSearchTerm, friends]);
+
 
   // --- Scroll to Bottom Logic ---
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -146,6 +202,71 @@ export function Chat() {
 
   };
 
+  // --- Add Room Sheet Logic ---
+   const handleFriendSelect = (friendId: string) => {
+        setSelectedFriends(prev =>
+            prev.includes(friendId)
+                ? prev.filter(id => id !== friendId)
+                : [...prev, friendId]
+        );
+   };
+
+   const handleCreateChat = async () => {
+       if (selectedFriends.length === 0) {
+           toast({
+               variant: "destructive",
+               title: "No Friends Selected",
+               description: "Please select at least one friend to start a chat.",
+           });
+           return;
+       }
+
+       if (selectedFriends.length > 1 && !groupName.trim()) {
+           toast({
+               variant: "destructive",
+               title: "Group Name Required",
+               description: "Please enter a name for your group chat.",
+           });
+           return;
+       }
+
+       setIsCreatingChat(true);
+
+       // Simulate chat creation
+       await new Promise(resolve => setTimeout(resolve, 1000));
+
+       const selectedFriendNames = friends
+           .filter(f => selectedFriends.includes(f.id))
+           .map(f => f.name);
+
+       let chatName: string;
+       if (selectedFriends.length === 1) {
+           chatName = selectedFriendNames[0]; // DM name is the friend's name
+       } else {
+           chatName = groupName.trim(); // Group chat name
+       }
+
+       console.log(`Creating chat with: ${selectedFriendNames.join(', ')}`);
+       if (selectedFriends.length > 1) {
+           console.log(`Group Name: ${chatName}`);
+       }
+
+       toast({
+           title: "Chat Created",
+           description: `Started a chat: ${chatName}`,
+       });
+
+        // Reset state and close sheet
+       setIsCreatingChat(false);
+       setIsAddRoomSheetOpen(false);
+       setSelectedFriends([]);
+       setGroupName('');
+       setFriendSearchTerm('');
+
+       // TODO: In a real app, you would navigate to the new chat room/update the chat list
+   };
+
+
   // --- Rendering ---
   return (
     // Use flex-col and h-full to ensure it fills the parent container
@@ -165,17 +286,119 @@ export function Chat() {
         </div>
          {isClient ? (
             <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="View Users" className="text-muted-foreground hover:text-foreground">
-                            <Users className="h-5 w-5" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>View Users (3)</TooltipContent>
-                </Tooltip>
+                <div className="flex items-center gap-1">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            {/* Add Room Sheet Trigger */}
+                             <Sheet open={isAddRoomSheetOpen} onOpenChange={setIsAddRoomSheetOpen}>
+                                <SheetTrigger asChild>
+                                    <Button variant="ghost" size="icon" aria-label="Add Room" className="text-muted-foreground hover:text-foreground">
+                                        <PlusCircle className="h-5 w-5" />
+                                    </Button>
+                                </SheetTrigger>
+                                 <SheetContent side="left" className="sm:max-w-sm flex flex-col">
+                                    <SheetHeader className="px-4 pt-4">
+                                        <SheetTitle>Create New Chat</SheetTitle>
+                                        <SheetDescription>
+                                            Select friends to start a direct message or group chat.
+                                        </SheetDescription>
+                                    </SheetHeader>
+                                     {/* Search Input */}
+                                    <div className="px-4 pt-4">
+                                        <div className="relative">
+                                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                placeholder="Search friends..."
+                                                className="pl-8 h-9 bg-muted/50"
+                                                value={friendSearchTerm}
+                                                onChange={(e) => setFriendSearchTerm(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                     {/* Group Name Input (Conditional) */}
+                                     {selectedFriends.length > 1 && (
+                                        <div className="px-4 pt-4">
+                                            <Label htmlFor="group-name">Group Name</Label>
+                                            <Input
+                                                id="group-name"
+                                                placeholder="Enter group chat name"
+                                                value={groupName}
+                                                onChange={(e) => setGroupName(e.target.value)}
+                                                className="mt-1 h-9"
+                                            />
+                                        </div>
+                                     )}
+
+                                     {/* Friend List */}
+                                     <ScrollArea className="flex-1 px-4 py-4">
+                                         {filteredFriends.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-6">No friends found.</p>
+                                         ) : (
+                                            <div className="space-y-3">
+                                                {filteredFriends.map(friend => (
+                                                    <div
+                                                        key={friend.id}
+                                                        className={cn(
+                                                            "flex items-center justify-between p-2 rounded-md transition-colors cursor-pointer hover:bg-muted/50",
+                                                            selectedFriends.includes(friend.id) && "bg-muted"
+                                                        )}
+                                                        onClick={() => handleFriendSelect(friend.id)}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar className="h-8 w-8">
+                                                                <AvatarImage src={friend.avatar} alt={friend.name} />
+                                                                <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm font-medium">{friend.name}</span>
+                                                        </div>
+                                                        <Checkbox
+                                                            checked={selectedFriends.includes(friend.id)}
+                                                            onCheckedChange={() => handleFriendSelect(friend.id)}
+                                                            aria-label={`Select ${friend.name}`}
+                                                            className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                         )}
+                                    </ScrollArea>
+                                    <SheetFooter className="px-4 pb-4 pt-2 border-t">
+                                         <SheetClose asChild>
+                                             <Button variant="outline">Cancel</Button>
+                                         </SheetClose>
+                                        <Button
+                                            onClick={handleCreateChat}
+                                            disabled={selectedFriends.length === 0 || isCreatingChat || (selectedFriends.length > 1 && !groupName.trim())}
+                                        >
+                                            {isCreatingChat ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <UserCheck className="mr-2 h-4 w-4" />
+                                            )}
+                                            {selectedFriends.length > 1 ? "Create Group" : "Start Chat"}
+                                        </Button>
+                                    </SheetFooter>
+                                </SheetContent>
+                             </Sheet>
+                        </TooltipTrigger>
+                        <TooltipContent>Add Room</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label="View Users" className="text-muted-foreground hover:text-foreground">
+                                <Users className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View Users (3)</TooltipContent>
+                    </Tooltip>
+                </div>
             </TooltipProvider>
          ) : (
-            <Skeleton className="h-9 w-9 rounded-md" />
+            <div className="flex items-center gap-1">
+                <Skeleton className="h-9 w-9 rounded-md" />
+                <Skeleton className="h-9 w-9 rounded-md" />
+            </div>
          )}
       </CardHeader>
 
@@ -221,8 +444,11 @@ export function Chat() {
                       const isCurrentUser = msg.sender === currentUser;
                       // Show avatar if it's not the current user AND (it's the first message OR the previous message sender is different)
                       const showAvatar = !isCurrentUser && (index === 0 || messages[index - 1]?.sender !== msg.sender);
-                      // Show timestamp if it's the last message OR the next message sender is different
-                      const showTimestamp = index === messages.length - 1 || messages[index + 1]?.sender !== msg.sender;
+                      // Show timestamp if it's the last message OR the next message sender is different OR next message is more than 5 mins later
+                      const nextMessageTimestamp = messages[index + 1]?.timestamp;
+                      const timeDiff = nextMessageTimestamp ? nextMessageTimestamp - msg.timestamp : Infinity;
+                      const showTimestamp = index === messages.length - 1 || messages[index + 1]?.sender !== msg.sender || timeDiff > 5 * 60 * 1000;
+
 
                       return (
                          <div
@@ -257,7 +483,8 @@ export function Chat() {
                                 isCurrentUser
                                   ? 'bg-primary text-primary-foreground rounded-br-none animate-in slide-in-from-right-4 duration-300 ease-out'
                                   : 'bg-muted text-foreground rounded-bl-none animate-in slide-in-from-left-4 duration-300 ease-out',
-                                !showAvatar ? 'mt-1' : '' // Add slight margin top if avatar is not shown
+                                // Add margin top if avatar is not shown AND previous sender is the same
+                                (!showAvatar && index > 0 && messages[index-1].sender === msg.sender) ? 'mt-1' : 'mt-0'
                               )}
                             >
                                 {/* Sender Name (only if showing avatar and not current user) */}
@@ -359,4 +586,3 @@ export function Chat() {
     </div>
   );
 }
-
