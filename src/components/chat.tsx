@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SendHorizonal, Users, Paperclip, Image as ImageIcon, Bot, Smile, Loader2 } from 'lucide-react'; // Added Loader2
+import { SendHorizonal, Users, Paperclip, Image as ImageIcon, Bot, Smile, Loader2, MessageSquare } from 'lucide-react'; // Added Loader2 and MessageSquare
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -21,6 +21,7 @@ interface Message {
   avatar: string;
 }
 
+// Keep initialMessages for initial load simulation
 const initialMessages: Message[] = [
     { id: '1', sender: 'Alice', text: 'Hey Bob!', timestamp: Date.now() - 600000, avatar: 'https://picsum.photos/seed/alice/40/40' },
     { id: '2', sender: 'Bob', text: 'Hi Alice! What\'s up?', timestamp: Date.now() - 540000, avatar: 'https://picsum.photos/seed/bob/40/40' },
@@ -98,7 +99,7 @@ export function Chat() {
       sender: currentUser,
       text: trimmedMessage,
       timestamp: Date.now(),
-      avatar: 'https://picsum.photos/seed/bob/40/40',
+      avatar: 'https://picsum.photos/seed/bob/40/40', // Use current user's avatar
     };
 
      // Optimistic UI update
@@ -122,12 +123,16 @@ export function Chat() {
          const replyMessage: Message = {
              id: String(Date.now()),
              sender: 'Alice',
-             text: `Got it, ${currentUser}!`,
+             text: `Got it, ${currentUser}! 👋`,
              timestamp: Date.now(),
              avatar: 'https://picsum.photos/seed/alice/40/40',
          };
          setMessages(prevMessages => [...prevMessages, replyMessage]);
-         // Don't scroll for incoming messages unless user is near bottom? (Advanced)
+         // Consider scrolling only if user is near the bottom when receiving messages
+         // const viewport = viewportRef.current;
+         // if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100) {
+         //    scrollToBottom('smooth');
+         // }
      }, 1500);
 
   };
@@ -139,7 +144,7 @@ export function Chat() {
       {/* Chat Header */}
        <CardHeader className="flex flex-row items-center justify-between border-b border-border p-3 sm:p-4 sticky top-0 bg-background/80 backdrop-blur-sm z-10 flex-shrink-0">
         <div className="flex items-center gap-2">
-          {/* <MessageSquare className="h-5 w-5 text-secondary" /> */}
+          {/* Use a generic group icon or specific chat icon */}
           <div className="relative">
               <Avatar className="h-8 w-8 border-2 border-primary/50">
                   <AvatarImage src="https://picsum.photos/seed/group/40/40" alt="Global Chat" />
@@ -182,7 +187,7 @@ export function Chat() {
                                <div className={cn("flex flex-col gap-1.5", i % 2 === 0 ? 'items-start' : 'items-end')}>
                                    <Skeleton className={cn("h-4 w-20", i % 2 !== 0 && 'hidden')} /> {/* Sender name */}
                                    <Skeleton className={cn("h-10 rounded-lg", i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-32' : 'w-40')} />
-                                   <Skeleton className="h-3 w-10" /> {/* Timestamp */}
+                                   <Skeleton className="h-3 w-10 inline-block" /> {/* Timestamp - use inline-block for proper skeleton display */}
                                </div>
                                {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
                            </div>
@@ -198,7 +203,9 @@ export function Chat() {
                     // Actual Messages
                     messages.map((msg, index) => {
                       const isCurrentUser = msg.sender === currentUser;
+                      // Show avatar if it's not the current user AND (it's the first message OR the previous message sender is different)
                       const showAvatar = !isCurrentUser && (index === 0 || messages[index - 1]?.sender !== msg.sender);
+                      // Show timestamp if it's the last message OR the next message sender is different
                       const showTimestamp = index === messages.length - 1 || messages[index + 1]?.sender !== msg.sender;
 
                       return (
@@ -210,7 +217,7 @@ export function Chat() {
                           )}
                          >
                            {/* Sender Avatar (Conditional) */}
-                           <div className="w-8 flex-shrink-0"> {/* Placeholder for spacing */}
+                           <div className="w-8 flex-shrink-0 self-end"> {/* Align avatar to bottom */}
                             {showAvatar && (
                                 <TooltipProvider delayDuration={300}>
                                     <Tooltip>
@@ -229,24 +236,25 @@ export function Chat() {
 
                             {/* Message Bubble */}
                             <div
-                            className={cn(
-                                "max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm relative", // Reduced padding, smaller shadow
+                              className={cn(
+                                "max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm relative flex flex-col", // Flex column for text and timestamp
                                 isCurrentUser
-                                ? 'bg-primary text-primary-foreground rounded-br-none animate-in slide-in-from-right-4 duration-300 ease-out' // Adjust animation
-                                : 'bg-muted text-foreground rounded-bl-none animate-in slide-in-from-left-4 duration-300 ease-out' // Adjust animation
-                            )}
-                           >
-                                {/* Sender Name (only if showing avatar) */}
-                                {showAvatar && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
+                                  ? 'bg-primary text-primary-foreground rounded-br-none animate-in slide-in-from-right-4 duration-300 ease-out'
+                                  : 'bg-muted text-foreground rounded-bl-none animate-in slide-in-from-left-4 duration-300 ease-out',
+                                showAvatar ? 'mt-1' : '' // Add slight margin top if avatar is not shown
+                              )}
+                            >
+                                {/* Sender Name (only if showing avatar and not current user) */}
+                                {showAvatar && !isCurrentUser && <p className="font-semibold text-xs mb-0.5 text-primary">{msg.sender}</p>}
                                 {/* Message Text */}
-                                <p className="leading-snug">{msg.text}</p> {/* Improved line height */}
+                                <p className="leading-snug break-words">{msg.text}</p> {/* Improved line height, ensure word breaks */}
 
-                                {/* Timestamp (conditionally displayed) */}
+                                {/* Timestamp (conditionally displayed, aligned right within bubble) */}
                                 <span className={cn(
-                                    "text-[10px] opacity-60 mt-1 float-right clear-both transition-opacity duration-200", // Smaller timestamp
+                                    "text-[10px] opacity-60 mt-1 self-end transition-opacity duration-200 min-h-[1em]", // Ensure min-height for skeleton
                                     showTimestamp ? 'opacity-60' : 'opacity-0' // Hide if not last message of group
                                 )}>
-                                   {isClient ? format(new Date(msg.timestamp), 'p') : '...'} {/* Show skeleton on server */}
+                                   {isClient ? format(new Date(msg.timestamp), 'p') : <Skeleton className="h-3 w-10 inline-block" />} {/* Show skeleton on server, use inline-block */}
                                 </span>
                             </div>
 
@@ -260,8 +268,8 @@ export function Chat() {
       </CardContent>
 
       {/* Chat Input Bar */}
-      {/* Use flex-shrink-0 to prevent it from shrinking */}
-      <div className="p-2 sm:p-4 border-t border-border bg-background sticky bottom-0 z-10 flex-shrink-0">
+      {/* Use flex-shrink-0 to prevent it from shrinking. Remove sticky positioning. */}
+      <div className="p-2 sm:p-4 border-t border-border bg-background flex-shrink-0">
          {isClient ? (
            <TooltipProvider delayDuration={200}>
              <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-1 sm:space-x-2">

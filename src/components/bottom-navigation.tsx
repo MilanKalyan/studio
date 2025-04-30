@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -87,7 +88,8 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
     }
     // Close any open sheet when navigating or opening another sheet
     if (!item.isSheet || (item.isSheet && openSheet !== item.id)) {
-        setOpenSheet(null);
+        // Keep sheet open logic happens in handleSheetOpenChange
+        // setOpenSheet(null);
     }
   };
 
@@ -97,20 +99,22 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
 
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border shadow-lg z-50 flex items-center justify-around px-2 backdrop-blur-sm bg-card/80">
+    // Adjusted height (h-14), subtle background, less blur
+    <nav className="fixed bottom-0 left-0 right-0 h-14 bg-card/90 border-t border-border/70 shadow-sm z-50 flex items-center justify-around px-1 backdrop-blur-sm">
       <TooltipProvider delayDuration={100}>
         {navItems.map((item) => {
            const isActive = !item.isSheet && pathname === item.path;
            const isSheetOpen = openSheet === item.id;
 
            const buttonContent = (
-              <div className="flex flex-col items-center justify-center h-full w-full gap-0.5">
+              // Reduced gap, slightly smaller icon and text
+              <div className="flex flex-col items-center justify-center h-full w-full gap-0">
                 <item.icon className={cn(
-                    "h-5 w-5 transition-colors duration-200",
+                    "h-4 w-4 transition-colors duration-200", // Smaller icon (h-4 w-4)
                     isActive || isSheetOpen ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span className={cn(
-                    "text-[10px] leading-tight mt-0.5 transition-colors duration-200", // Smaller text, tighter line height
+                    "text-[9px] leading-tight mt-1 transition-colors duration-200", // Smaller text (text-[9px]), adjusted margin
                     isActive || isSheetOpen ? "text-primary font-medium" : "text-muted-foreground group-hover:text-foreground"
                 )}>
                     {item.label}
@@ -129,10 +133,11 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                         <Button
                           variant="ghost"
                           className={cn(
-                            "h-full flex-1 group flex flex-col items-center justify-center p-1 transition-transform duration-200 ease-out relative overflow-hidden", // Use flex-1
-                            isSheetOpen ? 'scale-105' : 'hover:scale-105 active:scale-100'
+                            "h-full flex-1 group flex flex-col items-center justify-center p-0.5 transition-transform duration-200 ease-out relative overflow-hidden rounded-sm", // Reduced padding, added rounded-sm
+                            isSheetOpen ? 'scale-105 bg-primary/5' : 'hover:scale-105 active:scale-100 hover:bg-muted/50' // Adjusted hover/active states
                           )}
                            aria-label={`Open ${item.label} sheet`}
+                           onClick={() => handleNavigation(item)} // Ensure sheet opens via nav logic
                         >
                           {buttonContent}
                            <div className={cn(
@@ -144,12 +149,12 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                   </TooltipTrigger>
                   <TooltipContent side="top">{item.label}</TooltipContent>
                 </Tooltip>
-                <SheetContent side="bottom" className="h-[85svh] flex flex-col"> {/* Adjust height, make flex col */}
-                  <SheetHeader className="flex-shrink-0"> {/* Prevent header from shrinking */}
-                    <SheetTitle className="text-center">{item.sheetTitle}</SheetTitle>
+                <SheetContent side="bottom" className="h-[80svh] flex flex-col rounded-t-lg" onOpenAutoFocus={(e) => e.preventDefault()}> {/* Reduced height, rounded top */}
+                  <SheetHeader className="flex-shrink-0 border-b pb-2"> {/* Added border-b and padding */}
+                    <SheetTitle className="text-center text-lg">{item.sheetTitle}</SheetTitle>
                   </SheetHeader>
                   {/* Make content scrollable */}
-                  <div className="flex-1 overflow-y-auto pb-4">
+                  <div className="flex-1 overflow-y-auto pt-2 pb-4"> {/* Added padding top */}
                     <SheetContentComponent {...item.sheetProps} />
                   </div>
                 </SheetContent>
@@ -164,8 +169,8 @@ export function BottomNavigation({ onLogout }: BottomNavigationProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "h-full flex-1 group flex flex-col items-center justify-center p-1 transition-transform duration-200 ease-out relative overflow-hidden", // Use flex-1
-                     isActive ? 'scale-105' : 'hover:scale-105 active:scale-100'
+                    "h-full flex-1 group flex flex-col items-center justify-center p-0.5 transition-transform duration-200 ease-out relative overflow-hidden rounded-sm", // Reduced padding, added rounded-sm
+                     isActive ? 'scale-105 bg-primary/5' : 'hover:scale-105 active:scale-100 hover:bg-muted/50' // Adjusted hover/active states
                   )}
                    onClick={() => handleNavigation(item)}
                    aria-current={isActive ? 'page' : undefined}

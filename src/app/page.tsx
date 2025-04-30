@@ -1,3 +1,4 @@
+
 'use client'; // Mark as client component for authentication checks
 
 import { useState, useEffect } from 'react';
@@ -66,9 +67,8 @@ export default function Home() {
   // Render main app layout if authenticated
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10"> {/* Use h-screen for full height */}
-       {/* Main Content Area - Use flex-1 to take remaining space, ensure padding-bottom for nav */}
-       {/* Removed overflow-hidden from main to allow content to potentially scroll behind padding */}
-       <main className="flex-1 p-2 md:p-4 pb-20"> {/* pb-20 (5rem) accommodates h-16 (4rem) nav */}
+       {/* Main Content Area - Adjust padding-bottom to match new nav height (h-14 = 3.5rem -> pb-16 (4rem)) */}
+       <main className="flex-1 p-2 md:p-4 pb-16"> {/* Adjust pb-16 for h-14 nav */}
          <Card className="h-full w-full shadow-xl border-primary/10 overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-0">
              {/* Chat Area - Takes full height within Card */}
              <div className="lg:col-span-2 h-full overflow-hidden border-r border-border/50">
