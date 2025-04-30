@@ -99,7 +99,8 @@ export default function Home() {
        {/* Main Content Area - flex-1 allows it to grow. */}
        {/* overflow-hidden ensures content doesn't spill out */}
        {/* Added relative positioning context for the FAB */}
-       <main className="flex-1 p-2 md:p-4 overflow-hidden relative">
+       {/* Added padding-bottom (pb-20) to prevent overlap with FAB */}
+       <main className="flex-1 p-2 md:p-4 overflow-hidden relative pb-20">
          {/* AppLayout handles the main structure */}
          <AppLayout />
        </main>
