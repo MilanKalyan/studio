@@ -92,25 +92,23 @@ interface ChatProps {
     isLoading: boolean; // Renamed from isChatLoading for clarity
     currentUser: string;
     currentUserId: string;
-    onSwitchChat: (chatId: string, newChatDetails?: ChatRoom) => void;
-    // onAddMessage is removed as messages are handled via Firebase
-    onAddChatRoom: (newRoom: ChatRoom) => void;
+    onSwitchChat: (chatId: string, newChatDetails?: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => void; // Adjusted type for newChatDetails
+    onAddChatRoom: (newRoom: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => Promise<void>; // Adjusted type
 }
 
 
 export function Chat({
     chatRooms,
     currentChat,
-    isLoading: isChatLoading, // Use prop name internally
+    isLoading: isOverallLoading, // Use prop name internally
     currentUser,
     currentUserId,
     onSwitchChat,
-    // onAddMessage is removed
     onAddChatRoom
 }: ChatProps) {
   const [newMessageText, setNewMessageText] = useState(''); // State for the input field text
   const [isSending, setIsSending] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(false); // State to track client-side mount
   const [messages, setMessages] = useState<Message[]>([]); // State for messages fetched from Firestore
   const [isMessagesLoading, setIsMessagesLoading] = useState(true); // Separate loading state for messages
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -126,7 +124,7 @@ export function Chat({
 
   // --- Client-Side Mounting & Initial Friend Load ---
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true); // Component has mounted
     const timer = setTimeout(() => {
         const otherFriends = placeholderFriends.filter(friend => friend.id !== currentUserId);
         setFriends(otherFriends);
@@ -152,28 +150,34 @@ export function Chat({
 
   // --- Firestore Message Fetching ---
   useEffect(() => {
-    if (!currentChat || currentChat.id === 'loading') {
+    // Use a more descriptive condition for clarity
+    const noChatSelected = !currentChat || currentChat.id === 'loading';
+
+    if (noChatSelected) {
       setMessages([]); // Clear messages if no chat selected
       setIsMessagesLoading(false);
       return;
     }
 
     setIsMessagesLoading(true);
-    console.log(`Subscribing to messages for chat: ${currentChat.id}`);
+    // console.log(`Subscribing to messages for chat: ${currentChat.id}`);
 
     const messagesCollectionRef = collection(db, 'chats', currentChat.id, 'messages');
     const q = query(messagesCollectionRef, orderBy('createdAt', 'asc')); // Order by Firestore Timestamp
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log(`Received snapshot for ${currentChat.id} with ${snapshot.docs.length} messages.`);
+      // console.log(`Received snapshot for ${currentChat.id} with ${snapshot.docs.length} messages.`);
       const msgs = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
       } as Message)); // Cast directly to Message
-      setMessages(msgs);
+
+      // Filter out potential messages without a valid createdAt timestamp before setting state
+      const validMsgs = msgs.filter(msg => msg.createdAt);
+      setMessages(validMsgs);
       setIsMessagesLoading(false);
-      // Scroll after messages are loaded
-      scrollToBottom('instant');
+      // Scroll after messages are loaded and state updated
+      scrollToBottom('instant'); // Scroll instantly on new chat load
     }, (error) => {
         console.error("Error fetching messages: ", error);
         toast({
@@ -186,7 +190,7 @@ export function Chat({
 
     // Cleanup subscription on chat change or unmount
     return () => {
-        console.log(`Unsubscribing from messages for chat: ${currentChat.id}`);
+        // console.log(`Unsubscribing from messages for chat: ${currentChat?.id}`);
         unsubscribe();
     };
 
@@ -195,9 +199,11 @@ export function Chat({
 
   // --- Scroll to Bottom Logic ---
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+      // Debounce or throttle might be needed if calls become too frequent
       requestAnimationFrame(() => {
           const viewport = viewportRef.current;
           if (viewport) {
+              // console.log(`Scrolling ${behavior}. ScrollTop: ${viewport.scrollTop}, ScrollHeight: ${viewport.scrollHeight}`);
               viewport.scrollTo({ top: viewport.scrollHeight, behavior });
           }
       });
@@ -247,7 +253,7 @@ export function Chat({
         // Add message to the subcollection of the current chat
         const messagesCollectionRef = collection(db, 'chats', currentChat.id, 'messages');
         await addDoc(messagesCollectionRef, messageData);
-        console.log(`Message sent to chat: ${currentChat.id}`);
+        // console.log(`Message sent to chat: ${currentChat.id}`);
         setNewMessageText(''); // Clear input after successful send
         // Scroll handled by useEffect watching messages
     } catch (error) {
@@ -282,13 +288,15 @@ export function Chat({
        }
 
        setIsCreatingChat(true);
-       await new Promise(resolve => setTimeout(resolve, 700));
+       await new Promise(resolve => setTimeout(resolve, 700)); // Simulate backend operation
 
        const selectedFriendDetails = placeholderFriends.filter(f => selectedFriends.includes(f.id));
        const participantIds = [currentUserId, ...selectedFriends];
        const isGroup = selectedFriends.length > 1;
 
-       let newChat: ChatRoom;
+       let newChat: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>; // Use Omit for creating
+       let chatToSwitchToId: string;
+
        if (isGroup) {
             newChat = {
                 id: `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
@@ -297,6 +305,7 @@ export function Chat({
                 participants: participantIds,
                 avatar: `https://picsum.photos/seed/${encodeURIComponent(groupName.trim().replace(/\s+/g, '-'))}/40/40`
             };
+            chatToSwitchToId = newChat.id;
             toast({ title: "Group Chat Created", description: `Started group: ${newChat.name}` });
        } else {
            const friend = selectedFriendDetails[0];
@@ -305,26 +314,27 @@ export function Chat({
             const existingDm = chatRooms.find(room => room.id === existingDmId);
             if (existingDm) {
                 toast({ variant: "default", title: "Chat Exists", description: `Chat with ${friend.name} already exists.` });
-                onSwitchChat(existingDm.id);
-                setIsCreatingChat(false);
-                setIsAddRoomSheetOpen(false);
-                setSelectedFriends([]);
-                setGroupName('');
-                setFriendSearchTerm('');
-                return;
-            }
-
-            newChat = {
-                id: existingDmId,
-                name: friend.name,
-                type: 'dm',
-                participants: participantIds,
-                avatar: friend.avatar
-            };
-            toast({ title: "Direct Chat Started", description: `Chat with ${newChat.name} created.` });
+                chatToSwitchToId = existingDm.id; // Switch to existing DM
+                newChat = existingDm; // Set newChat to existing for consistency, though not strictly needed for addChatRoom
+            } else {
+                 newChat = {
+                    id: existingDmId,
+                    name: friend.name,
+                    type: 'dm',
+                    participants: participantIds,
+                    avatar: friend.avatar
+                };
+                chatToSwitchToId = newChat.id; // Switch to the newly created DM
+                toast({ title: "Direct Chat Started", description: `Chat with ${newChat.name} created.` });
+           }
        }
 
-        onAddChatRoom(newChat); // Update chat list in parent
+       // Call onAddChatRoom only if it's truly a new chat or to potentially update details
+       // onAddChatRoom handles adding to state and Firestore if needed via onSwitchChat
+       await onAddChatRoom(newChat); // Pass the base details
+
+       // Switch to the chat (whether new or existing)
+       onSwitchChat(chatToSwitchToId, newChat); // Pass details in case it was new
 
         // Reset form and close sheet
         setIsCreatingChat(false);
@@ -369,20 +379,21 @@ export function Chat({
         {/* Chat Switcher Dropdown */}
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring rounded-md hover:bg-accent" disabled={!currentChat || isChatLoading}>
+                {/* Disable trigger while overall app is loading */}
+                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring rounded-md hover:bg-accent" disabled={isOverallLoading}>
                     <div className="relative">
                         <Avatar className={cn(
                              "h-9 w-9 border-2 transition-colors duration-300",
                              currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' ? "border-green-500/80" : "border-border/60",
-                             (isChatLoading || currentChat?.id === 'loading') && "animate-pulse" // Use combined loading state
+                             (isOverallLoading || isMessagesLoading) && "animate-pulse" // Use combined loading state
                          )}>
                             <AvatarImage src={currentChatDisplay.avatar || ''} alt={currentChatDisplay.name} />
                             <AvatarFallback className="text-sm">{currentChatDisplay.fallback}</AvatarFallback>
                         </Avatar>
-                         {currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' && !(isChatLoading || currentChat?.id === 'loading') && (
+                         {currentChatDisplay.isOnline && currentChatDisplay.type === 'dm' && !(isOverallLoading || isMessagesLoading) && (
                             <span className="absolute bottom-[-2px] right-[-2px] block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background"></span>
                          )}
-                          {currentChatDisplay.dmFriend?.status === 'ingame' && !(isChatLoading || currentChat?.id === 'loading') && (
+                          {currentChatDisplay.dmFriend?.status === 'ingame' && !(isOverallLoading || isMessagesLoading) && (
                             <span className="absolute bottom-[-2px] right-[-2px] block h-3 w-3 rounded-full bg-blue-500 ring-2 ring-background"></span>
                          )}
                     </div>
@@ -404,7 +415,10 @@ export function Chat({
                 <DropdownMenuLabel>Chats</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                  <DropdownMenuGroup>
-                     {chatRooms.map(room => (
+                     {/* Sort rooms by last message time for the dropdown as well */}
+                     {[...chatRooms]
+                       .sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0))
+                       .map(room => (
                          <DropdownMenuItem
                             key={room.id}
                             onSelect={() => onSwitchChat(room.id)}
@@ -419,7 +433,7 @@ export function Chat({
                                 </Avatar>
                             ) : (
                                 <Avatar className="h-5 w-5">
-                                    <AvatarImage src={room.avatar || undefined} alt={room.name} />
+                                    <AvatarImage src={room.avatar || ''} alt={room.name} />
                                     <AvatarFallback className="text-xs">{room.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             )}
@@ -443,7 +457,8 @@ export function Chat({
                         <TooltipTrigger asChild>
                              <Sheet open={isAddRoomSheetOpen} onOpenChange={setIsAddRoomSheetOpen}>
                                 <SheetTrigger asChild>
-                                    <Button variant="ghost" size="icon" aria-label="Create New Chat" className="text-muted-foreground hover:text-foreground">
+                                     {/* Disable trigger while overall app is loading */}
+                                    <Button variant="ghost" size="icon" aria-label="Create New Chat" className="text-muted-foreground hover:text-foreground" disabled={isOverallLoading}>
                                         <PlusCircle className="h-5 w-5" />
                                     </Button>
                                 </SheetTrigger>
@@ -498,7 +513,7 @@ export function Chat({
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <Avatar className="h-8 w-8">
-                                                                <AvatarImage src={friend.avatar} alt={friend.name} />
+                                                                <AvatarImage src={friend.avatar || ''} alt={friend.name} />
                                                                 <AvatarFallback>{friend.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <div className="flex flex-col">
@@ -541,7 +556,8 @@ export function Chat({
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="View Chat Members or Profile" className="text-muted-foreground hover:text-foreground" disabled={!currentChat || isChatLoading}>
+                             {/* Disable trigger while overall app is loading */}
+                            <Button variant="ghost" size="icon" aria-label="View Chat Members or Profile" className="text-muted-foreground hover:text-foreground" disabled={!currentChat || isOverallLoading}>
                                 {currentChatDisplay.isGroup ? <Users className="h-5 w-5" /> : <User className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
@@ -564,7 +580,7 @@ export function Chat({
         <ScrollArea className="h-full" ref={scrollAreaRef}>
           <div ref={viewportRef} className="h-full">
               <div className="space-y-4 pb-4 px-4 pt-4">
-                {(isChatLoading || isMessagesLoading) ? ( // Combined loading check
+                {(isOverallLoading || isMessagesLoading) ? ( // Combined loading check
                     // Loading Skeletons
                     <>
                         {[...Array(8)].map((_, i) => (
@@ -596,19 +612,19 @@ export function Chat({
                     messages.map((msg, index) => {
                       const isCurrentUser = msg.senderId === currentUserId;
                       const prevMessage = messages[index - 1];
-                      // Use Firestore Timestamp for comparison
-                      const timeDiff = msg.createdAt && prevMessage?.createdAt
+                      // Ensure timestamps exist before comparison
+                      const timeDiff = msg.createdAt?.toMillis() && prevMessage?.createdAt?.toMillis()
                           ? msg.createdAt.toMillis() - prevMessage.createdAt.toMillis()
                           : Infinity;
 
-                      const showMeta = !prevMessage || prevMessage.senderId !== msg.senderId || timeDiff > 5 * 60 * 1000;
+                      const showMeta = !prevMessage || prevMessage.senderId !== msg.senderId || timeDiff > 5 * 60 * 1000; // 5 minutes
 
                       const nextMessage = messages[index + 1];
-                      const nextTimeDiff = nextMessage?.createdAt && msg.createdAt
+                      const nextTimeDiff = nextMessage?.createdAt?.toMillis() && msg.createdAt?.toMillis()
                            ? nextMessage.createdAt.toMillis() - msg.createdAt.toMillis()
                            : Infinity;
 
-                      const showTimestamp = !nextMessage || nextMessage.senderId !== msg.senderId || nextTimeDiff > 5 * 60 * 1000;
+                      const showTimestamp = !nextMessage || nextMessage.senderId !== msg.senderId || nextTimeDiff > 5 * 60 * 1000; // 5 minutes
 
                       return (
                          <div
@@ -625,7 +641,7 @@ export function Chat({
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Avatar className="h-8 w-8 animate-fade-in opacity-0 [--fade-in-delay:50ms]">
-                                                <AvatarImage src={msg.avatar} alt={msg.senderName} />
+                                                <AvatarImage src={msg.avatar || ''} alt={msg.senderName} />
                                                 <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                         </TooltipTrigger>
@@ -654,13 +670,13 @@ export function Chat({
                                     <p className="leading-snug break-words whitespace-pre-wrap">{msg.text}</p>
                                 </div>
 
-                                {isClient && msg.createdAt && ( // Check if createdAt exists and isClient
+                                {isClient && msg.createdAt && ( // Only render timestamp on client
                                     <span className={cn(
-                                        "text-[10px] opacity-0 mt-1 px-1 transition-opacity duration-300 min-h-[1em]", // Added min-h-[1em]
-                                        showTimestamp ? 'opacity-60' : '', // Don't hide if not showing, keep space
+                                        "text-[10px] opacity-0 mt-1 px-1 transition-opacity duration-300 min-h-[1em]", // Keep min-height
+                                        showTimestamp ? 'opacity-60' : '',
                                         isCurrentUser ? 'self-end' : 'self-start'
                                     )}>
-                                        {/* Format Firestore Timestamp */}
+                                        {/* Format Firestore Timestamp if showing */}
                                        {showTimestamp ? format(msg.createdAt.toDate(), 'p') : ''}
                                     </span>
                                 )}
@@ -681,7 +697,8 @@ export function Chat({
              <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-1 sm:space-x-2">
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isChatLoading || !currentChat || currentChat.id === 'loading'}>
+                        {/* Disable input elements if overall app is loading */}
+                        <Button variant="ghost" size="icon" type="button" aria-label="Emoji" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isOverallLoading || !currentChat || currentChat.id === 'loading'}>
                             <Smile className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -689,7 +706,8 @@ export function Chat({
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isChatLoading || !currentChat || currentChat.id === 'loading'} onClick={() => document.getElementById('file-input')?.click()}>
+                         {/* Disable input elements if overall app is loading */}
+                        <Button variant="ghost" size="icon" type="button" aria-label="Attach file" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isOverallLoading || !currentChat || currentChat.id === 'loading'} onClick={() => document.getElementById('file-input')?.click()}>
                             <Paperclip className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -704,7 +722,8 @@ export function Chat({
                  }} />
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" type="button" aria-label="AI Assistant" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isChatLoading || !currentChat || currentChat.id === 'loading'}>
+                         {/* Disable input elements if overall app is loading */}
+                        <Button variant="ghost" size="icon" type="button" aria-label="AI Assistant" className="text-muted-foreground hover:text-accent-foreground rounded-full interactive-hover" disabled={isOverallLoading || !currentChat || currentChat.id === 'loading'}>
                             <Bot className="h-5 w-5" />
                         </Button>
                     </TooltipTrigger>
@@ -718,13 +737,15 @@ export function Chat({
                     onChange={(e) => setNewMessageText(e.target.value)}
                     className="flex-1 bg-muted/60 focus:ring-primary focus:border-primary rounded-full px-4 h-10 transition-colors duration-200 border-transparent focus:bg-background"
                     aria-label="Chat message input"
-                    disabled={isSending || isChatLoading || !currentChat || currentChat.id === 'loading'}
+                    // Disable input elements if overall app is loading or sending
+                    disabled={isSending || isOverallLoading || !currentChat || currentChat.id === 'loading'}
                     autoComplete="off"
                 />
 
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0 interactive-hover" aria-label="Send message" disabled={isSending || !newMessageText.trim() || isChatLoading || !currentChat || currentChat.id === 'loading'}>
+                         {/* Disable input elements if overall app is loading or sending */}
+                        <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full retro-glow w-10 h-10 flex-shrink-0 interactive-hover" aria-label="Send message" disabled={isSending || !newMessageText.trim() || isOverallLoading || !currentChat || currentChat.id === 'loading'}>
                              {isSending ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
                              ) : (

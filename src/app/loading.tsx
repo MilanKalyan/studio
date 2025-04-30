@@ -4,8 +4,9 @@ import { cn } from '@/lib/utils';
 export default function Loading({ className }: { className?: string }) {
   return (
     <div className={cn(
-        "fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm space-y-4 transition-opacity duration-300",
-        className
+        // Added transition-opacity and duration for smoother fade
+        "fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm space-y-4 transition-opacity duration-300 ease-in-out",
+        className // Allows overriding styles or adding specific positioning classes
     )}>
       <div className="relative flex items-center justify-center">
         <Loader2 className="h-16 w-16 animate-spin text-primary opacity-50" />

@@ -1,7 +1,7 @@
 
 'use client'; // Mark as client component for authentication checks
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
 import { useRouter } from 'next/navigation';
 import LoginPage from './auth/login/page'; // Import the Login page
 import Loading from './loading'; // Import the Loading component
@@ -15,13 +15,9 @@ import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase/config'; // Import Firestore instance
 import { collection, onSnapshot, query, orderBy, Timestamp, setDoc, doc, serverTimestamp } from 'firebase/firestore'; // Added serverTimestamp
 
-// --- Initial Placeholder Data ---
-// Removed placeholder message generation and store
-// Chat rooms are still managed locally, but messages come from Firebase
-
 // Initial Room Data (without messages)
 const initialChatRoomsData: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>[] = [
-    { id: 'global', name: 'Global Chat', type: 'group', participants: ['bob', 'alice', 'charlie', 'dave', 'eve', 'frank'], avatar: 'https://picsum.photos/seed/group/40/40' },
+    { id: 'global', name: 'Global Chat', type: 'group', participants: ['bob', 'alice', 'charlie', 'dave', 'eve', 'frank'], avatar: 'https://picsum.photos/seed/global/40/40' },
     { id: `dm-bob-alice`, name: 'Alice', type: 'dm', participants: ['bob', 'alice'], avatar: 'https://picsum.photos/seed/alice/40/40' },
     { id: `group-chess-club`, name: 'Chess Club', type: 'group', participants: ['bob', 'alice', 'charlie'], avatar: 'https://picsum.photos/seed/chessclub/40/40' },
 ];
@@ -46,163 +42,200 @@ export default function Home() {
   // State for chat management (rooms only)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [currentChat, setCurrentChat] = useState<ChatRoom | null>(null);
-  const [isChatListLoading, setIsChatListLoading] = useState(true); // Loading state for chat room list and initial auth
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Combined initial loading state
   const currentUserId = 'bob'; // Simulate current user ID ('bob')
   const currentUser = placeholderFriendsData.find(f => f.id === currentUserId)?.name || 'User'; // Use placeholder data
+  const initialLoadCompleteRef = useRef(false); // Ref to track if initial load logic has finished
 
   // --- Data Initialization and Authentication Logic ---
   useEffect(() => {
     let isMounted = true;
+    initialLoadCompleteRef.current = false; // Reset on mount/re-run
 
-    // Simulate fetching/setting initial chat rooms (could fetch from backend later)
+    // Simulate fetching/setting initial chat rooms (placeholders before listener updates)
      const initialRoomsWithPlaceholders = initialChatRoomsData.map(roomData => ({
         ...roomData,
         lastMessage: 'Loading...', // Placeholder last message
         lastMessageTime: Date.now() - Math.random() * 1000000 // Placeholder time for initial sort
      }));
-     // Ensure initial state doesn't cause errors before Firebase listener updates it
+     // Set initial rooms to avoid errors before Firebase listener updates
      setChatRooms(initialRoomsWithPlaceholders.sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0)));
 
 
     const checkAuth = async () => {
-      await new Promise(resolve => setTimeout(resolve, 400)); // Simulate auth check delay
-
-      const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
-      const profileComplete = sessionStorage.getItem('isProfileComplete') === 'true';
+      // Simulate auth check delay, slightly longer for smoother feel if needed
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       if (!isMounted) return;
 
+      const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
+      const profileComplete = sessionStorage.getItem('isProfileComplete') === 'true';
       let newAuthStatus: typeof authStatus;
+
       if (!loggedIn) {
           newAuthStatus = 'unauthenticated';
           setCurrentChat(null);
-          // No message state to reset here
-          setIsChatListLoading(true); // Reset overall loading
+          setIsInitialLoad(false); // Stop loading if unauthenticated
       } else if (!profileComplete) {
           newAuthStatus = 'authenticated_needs_setup';
           setCurrentChat(null);
+          setIsInitialLoad(false); // Stop loading during setup phase
       } else {
           newAuthStatus = 'authenticated';
-          // If authenticated and profile is complete, set default chat
-          if (!currentChat) {
-            const globalChat = initialRoomsWithPlaceholders.find(room => room.id === 'global');
-            if (globalChat) {
-                setCurrentChat(globalChat);
-                // Don't set loading false here, let Firestore listener do it
-            } else {
-                setIsChatListLoading(false); // No global chat? Stop loading
-            }
-          } else {
-             // If currentChat is already set (e.g., by switchChat)
-             // Don't set loading false here, let Firestore listener do it
-          }
+          // Don't set isInitialLoad to false here; let the listener handle it
+          // Select initial chat only if not already set
+           if (!currentChat) {
+               const globalChat = initialRoomsWithPlaceholders.find(room => room.id === 'global');
+               if (globalChat) {
+                   setCurrentChat(globalChat);
+               }
+               // Keep isInitialLoad true until listener confirms data load
+           }
       }
       setAuthStatus(newAuthStatus);
     };
 
     checkAuth();
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      initialLoadCompleteRef.current = true; // Mark as complete on unmount to stop any pending updates
+    };
   }, []); // Run only once on mount
 
   // --- Firestore Listener for Last Messages ---
   useEffect(() => {
-    // Listen to last message updates for all *initial* rooms
-    // In a real app, you'd likely fetch rooms and then listen
-    let initialLoadComplete = false; // Track if initial load is done
+    // Only run listener if authenticated and profile is complete
+    if (authStatus !== 'authenticated') {
+        // If not authenticated, ensure loading is false
+        if (authStatus !== 'loading' && !initialLoadCompleteRef.current) { // Check ref to prevent race condition
+           setIsInitialLoad(false);
+           initialLoadCompleteRef.current = true;
+        }
+        return; // Exit if not authenticated
+    }
+
+    console.log("Setting up Firestore listeners for chat rooms.");
+
+    // Use a counter to track how many listeners have loaded their initial data
+    let loadedListenersCount = 0;
+    const totalListeners = initialChatRoomsData.length;
 
     const unsubscribers = initialChatRoomsData.map(roomData => {
         const messagesCollectionRef = collection(db, 'chats', roomData.id, 'messages');
-        const q = query(messagesCollectionRef, orderBy('createdAt', 'desc'), /* limit(1) */); // Get latest message
+        const q = query(messagesCollectionRef, orderBy('createdAt', 'desc'), /* limit(1) */);
 
-         // Using limit(1) might be more efficient, but requires index setup.
-         // This approach fetches all, then takes the latest client-side.
         return onSnapshot(q, (snapshot) => {
+            if (initialLoadCompleteRef.current) return; // Stop updates if already marked complete
+
+            let isInitialDataForThisListener = false;
+            // Check if this listener has contributed to the count yet
+            if (!snapshot.metadata.hasPendingWrites && loadedListenersCount < totalListeners) {
+                loadedListenersCount++;
+                isInitialDataForThisListener = true;
+                // console.log(`Listener for ${roomData.id} initial data loaded (${loadedListenersCount}/${totalListeners}).`);
+            }
+
             if (!snapshot.empty) {
-                const lastMsgDoc = snapshot.docs[0]; // Get the most recent doc
-                const lastMsgData = lastMsgDoc.data() as Omit<Message, 'id'>; // Cast to Message basic structure
+                const lastMsgDoc = snapshot.docs[0];
+                const lastMsgData = lastMsgDoc.data() as Omit<Message, 'id'>;
                 setChatRooms(prevRooms => {
                     const updatedRooms = prevRooms.map(room =>
                         room.id === roomData.id
                             ? {
                                 ...room,
                                 lastMessage: lastMsgData.text.length > 30 ? lastMsgData.text.substring(0, 27) + '...' : lastMsgData.text,
-                                lastMessageTime: lastMsgData.createdAt ? lastMsgData.createdAt.toMillis() : Date.now(), // Use timestamp if available
+                                lastMessageTime: lastMsgData.createdAt ? lastMsgData.createdAt.toMillis() : Date.now(),
                             }
                             : room
-                    ).sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0)); // Re-sort after update
+                    ).sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
 
-                    // Check if this is the last update in the initial batch
-                    if (!initialLoadComplete && updatedRooms.every(room => room.lastMessage !== 'Loading...')) {
-                         setIsChatListLoading(false);
-                         initialLoadComplete = true;
-                         console.log("Initial chat list load complete.");
+                    // Only set loading false when all listeners have reported their initial state
+                    if (!initialLoadCompleteRef.current && isInitialDataForThisListener && loadedListenersCount === totalListeners) {
+                        console.log("All Firestore listeners loaded initial data.");
+                         setIsInitialLoad(false);
+                         initialLoadCompleteRef.current = true;
                     }
                     return updatedRooms;
                  });
             } else {
-                 // Handle case where chat has no messages yet
                  setChatRooms(prevRooms => {
                      const updatedRooms = prevRooms.map(room =>
                          room.id === roomData.id
-                             ? { ...room, lastMessage: 'No messages yet', lastMessageTime: room.lastMessageTime ?? 0 } // Keep original time or 0 if never set
+                             ? { ...room, lastMessage: 'No messages yet', lastMessageTime: room.lastMessageTime ?? 0 }
                              : room
                      ).sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
 
-                    // Check if this is the last update in the initial batch
-                    if (!initialLoadComplete && updatedRooms.every(room => room.lastMessage !== 'Loading...')) {
-                         setIsChatListLoading(false);
-                         initialLoadComplete = true;
-                         console.log("Initial chat list load complete (empty chat found).");
+                    // Only set loading false when all listeners have reported their initial state
+                    if (!initialLoadCompleteRef.current && isInitialDataForThisListener && loadedListenersCount === totalListeners) {
+                        console.log("All Firestore listeners loaded initial data (some empty).");
+                        setIsInitialLoad(false);
+                        initialLoadCompleteRef.current = true;
                     }
                      return updatedRooms;
                  });
             }
         }, (error) => {
             console.error(`Error listening to last message for ${roomData.id}: `, error);
-            // Optionally show a toast or indicator
-             setIsChatListLoading(false); // Stop loading on error too
+            // Stop loading on error, maybe show a specific error state?
+            if (!initialLoadCompleteRef.current) {
+                loadedListenersCount++; // Count this listener as 'done' even if errored
+                 if (loadedListenersCount === totalListeners) {
+                     setIsInitialLoad(false);
+                     initialLoadCompleteRef.current = true;
+                     console.error("Finished initial load with errors.");
+                 }
+            }
         });
     });
 
-     // Fallback: If after a short delay, loading is still true, force it to false
+     // Fallback timeout remains useful
      const loadingTimeout = setTimeout(() => {
-        if (isChatListLoading && authStatus === 'authenticated') {
-            console.warn("Forcing chat list loading to false after timeout.");
-            setIsChatListLoading(false);
-            initialLoadComplete = true; // Mark as complete to prevent future attempts
+        if (isInitialLoad && !initialLoadCompleteRef.current) {
+            console.warn("Forcing initial load to false after timeout.");
+            setIsInitialLoad(false);
+            initialLoadCompleteRef.current = true;
         }
-     }, 5000); // 5 seconds timeout
+     }, 7000); // Slightly longer timeout
 
 
-    // Cleanup all listeners and timeout on unmount
+    // Cleanup all listeners and timeout on unmount or auth change
     return () => {
+        console.log("Cleaning up Firestore listeners.");
         unsubscribers.forEach(unsub => unsub());
         clearTimeout(loadingTimeout);
+        // Reset ref for potential future logins without full page reload
+        // initialLoadCompleteRef.current = false; // Keep it true until next mount
     };
-    // Depend on authStatus to re-run if user logs in/out? No, separate effect handles that.
-  }, [authStatus]); // Re-run when authStatus changes to authenticated
+  }, [authStatus]); // Re-run when authStatus changes
 
 
    const handleLoginSuccess = () => {
        sessionStorage.setItem('isAuthenticated', 'true');
-       sessionStorage.removeItem('isProfileComplete'); // Ensure setup runs if needed
-       setAuthStatus('loading'); // Go back to loading briefly to re-check status
-       setIsChatListLoading(true); // Ensure chat list reloads
-       // Trigger the checkAuth logic again
+       sessionStorage.removeItem('isProfileComplete'); // Ensure setup check runs
+       setAuthStatus('loading'); // Briefly show loading
+       setIsInitialLoad(true); // Reset initial load state for potential data fetch
+       initialLoadCompleteRef.current = false; // Reset completion ref
+
+       // Trigger the checkAuth logic again after a short delay
        const checkAuthOnLogin = async () => {
-           await new Promise(resolve => setTimeout(resolve, 100)); // Short delay
+           await new Promise(resolve => setTimeout(resolve, 150)); // Minimal delay
            const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
            const profileComplete = sessionStorage.getItem('isProfileComplete') === 'true';
+            if (!isInitialLoad && initialLoadCompleteRef.current) return; // Avoid race condition if already completed
+
             if (loggedIn && !profileComplete) {
                setAuthStatus('authenticated_needs_setup');
                setCurrentChat(null);
+               setIsInitialLoad(false); // Stop loading for setup
+               initialLoadCompleteRef.current = true;
             } else if (loggedIn && profileComplete) {
                 setAuthStatus('authenticated');
-                 // Setting default chat handled by the useEffect watching authStatus
+                 // Listener useEffect will handle setting isInitialLoad to false
             } else {
-                // Should not happen, but handle fallback
                 setAuthStatus('unauthenticated');
+                 setIsInitialLoad(false); // Stop loading if somehow unauthenticated
+                 initialLoadCompleteRef.current = true;
             }
        };
        checkAuthOnLogin();
@@ -211,11 +244,18 @@ export default function Home() {
 
     const handleProfileSetupComplete = () => {
         sessionStorage.setItem('isProfileComplete', 'true');
-        setAuthStatus('authenticated');
-        // Setting default chat handled by the useEffect watching authStatus
-        // Ensure loading is false after setup
-        setIsChatListLoading(false);
-        router.replace('/');
+        setAuthStatus('loading'); // Briefly show loading before transitioning to authenticated
+        setIsInitialLoad(true); // Start loading sequence for authenticated state
+        initialLoadCompleteRef.current = false;
+
+        // Need to re-trigger the auth check flow
+        const checkAuthOnSetupComplete = async () => {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            setAuthStatus('authenticated');
+            // Listener useEffect will handle setting isInitialLoad to false
+            router.replace('/'); // Navigate after state update begins
+        };
+        checkAuthOnSetupComplete();
     };
 
    const handleLogout = () => {
@@ -223,7 +263,8 @@ export default function Home() {
        sessionStorage.removeItem('isProfileComplete');
        setAuthStatus('unauthenticated');
        setCurrentChat(null);
-       setIsChatListLoading(true); // Reset loading
+       setIsInitialLoad(true); // Reset loading state for next potential login
+       initialLoadCompleteRef.current = false; // Reset completion ref
        // Reset chat rooms to initial placeholder state
         const initialRoomsWithPlaceholders = initialChatRoomsData.map(roomData => ({
             ...roomData, lastMessage: 'Loading...', lastMessageTime: Date.now()
@@ -233,9 +274,9 @@ export default function Home() {
 
    // --- Chat Management Logic ---
     const handleSwitchChat = useCallback(async (chatId: string, newChatDetails?: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => {
-        // Prevent switching during setup or to the same chat or during load
-        if (authStatus === 'authenticated_needs_setup' || chatId === currentChat?.id || chatId === 'loading') {
-             console.log(`Switch chat blocked: authStatus=${authStatus}, currentChatId=${currentChat?.id}, targetChatId=${chatId}`);
+        // Prevent switching during setup or to the same chat or during initial load
+        if (authStatus === 'authenticated_needs_setup' || chatId === currentChat?.id || isInitialLoad) {
+             console.log(`Switch chat blocked: authStatus=${authStatus}, currentChatId=${currentChat?.id}, targetChatId=${chatId}, isInitialLoad=${isInitialLoad}`);
              return;
         }
 
@@ -282,7 +323,7 @@ export default function Home() {
                  } catch (error) {
                      console.error("Error creating Firestore chat document:", error);
                      toast({ variant: "destructive", title: "Chat Creation Failed", description: "Could not save chat details." });
-                     // Optionally revert optimistic update
+                     // Revert optimistic update
                      setChatRooms(prev => prev.filter(room => room.id !== roomToAdd.id));
                      return; // Prevent switching to the failed chat
                  }
@@ -299,11 +340,10 @@ export default function Home() {
         // Set current chat - message loading is handled within Chat component's useEffect
         setCurrentChat(targetChat);
 
-    }, [authStatus, currentChat?.id, chatRooms, toast]); // Added chatRooms dependency
+    }, [authStatus, currentChat?.id, chatRooms, toast, isInitialLoad]); // Added isInitialLoad dependency
 
 
     // Function to add a new chat room (called from Chat component's sheet)
-    // Now mostly handled by handleSwitchChat logic
     const addChatRoom = async (newRoomData: Omit<ChatRoom, 'lastMessage' | 'lastMessageTime'>) => {
         // Reuse handleSwitchChat logic - if the room exists, it switches; if not, it creates and switches.
          handleSwitchChat(newRoomData.id, newRoomData);
@@ -311,8 +351,9 @@ export default function Home() {
 
 
    // --- Rendering Logic ---
-   if (authStatus === 'loading') { // Simpler loading check initially
-     return <Loading />;
+   // Use isInitialLoad for the main loading overlay
+   if (isInitialLoad && authStatus === 'loading') {
+     return <Loading />; // Show loading overlay during initial auth check and data load
    }
 
    if (authStatus === 'unauthenticated') {
@@ -332,28 +373,26 @@ export default function Home() {
      <div className="flex flex-col flex-1 h-full overflow-hidden">
        {/* Use a wrapper div to contain main content and FAB, allowing main to scroll independently */}
        <div className="flex-1 flex overflow-hidden relative">
-          {/* Conditional Loading Overlay for Chat List */}
-          {isChatListLoading && <Loading className="absolute z-50" />} {/* Show overlay only when list is loading */}
+          {/* Conditional Loading Overlay (use isInitialLoad) */}
+          {isInitialLoad && <Loading className="absolute z-50 opacity-100" />} {/* Use isInitialLoad */}
 
           <main className={cn(
-              "flex-1 p-2 md:p-3 overflow-hidden transition-opacity duration-300",
-              isChatListLoading ? "opacity-50 pointer-events-none" : "opacity-100" // Fade out main content while loading list
+              "flex-1 p-2 md:p-3 overflow-hidden transition-opacity duration-300 ease-in-out",
+              isInitialLoad ? "opacity-0 pointer-events-none" : "opacity-100" // Fade in main content when loading is finished
           )}>
              <AppLayout
                  chatRooms={chatRooms}
                  currentChat={currentChat}
-                 // messages prop removed
-                 isChatLoading={isChatListLoading} // Pass overall loading state
+                 isChatLoading={isInitialLoad} // Pass overall initial load state
                  currentUser={currentUser}
                  currentUserId={currentUserId}
                  onSwitchChat={handleSwitchChat}
-                 // onAddMessage prop removed
                  onAddChatRoom={addChatRoom}
               />
            </main>
            {/* FAB Container - Absolutely positioned within the relative parent */}
-           {/* Only render BottomNavigation if not loading the chat list */}
-           {!isChatListLoading && (
+           {/* Only render BottomNavigation if not initially loading */}
+           {!isInitialLoad && (
               <div className="absolute inset-0 pointer-events-none">
                    <BottomNavigation
                        onLogout={handleLogout}
@@ -368,5 +407,3 @@ export default function Home() {
      </div>
    );
 }
-
-    

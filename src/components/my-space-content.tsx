@@ -58,12 +58,12 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
   const [recentActivities, setRecentActivities] = useState<(typeof placeholderRecentActivities[0])[]>([]);
   const [favoriteGames, setFavoriteGames] = useState<(typeof placeholderFavoriteGames[0])[]>([]);
   const [friends, setFriends] = useState<Player[]>([]); // Keep friends list local for Add Friend functionality
-  const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(false); // State to track client-side mount
   const currentUserId = 'bob'; // Simulate current user ID for DM creation
 
 
   useEffect(() => {
-      setIsClient(true);
+      setIsClient(true); // Component has mounted
       // Simulate loading data (except chatRooms which comes from props)
       const timer = setTimeout(() => {
           setRecentActivities(placeholderRecentActivities);
@@ -118,7 +118,7 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
 
     // Function to handle clicking on a chat in the list
     const handleChatClick = (chatId: string) => {
-        console.log("MySpace: Clicked chat:", chatId);
+        // console.log("MySpace: Clicked chat:", chatId);
         // Use the onSwitchChat prop passed down from Home
         onSwitchChat(chatId);
         // Optionally close the sheet after switching (consider UX)
@@ -127,7 +127,7 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
 
      // Function to handle clicking a friend to start/open a DM
      const handleFriendClick = (friend: Player) => {
-         console.log("MySpace: Clicked friend:", friend.name);
+         // console.log("MySpace: Clicked friend:", friend.name);
          // Generate the potential DM chat ID
          const dmId = `dm-${[currentUserId, friend.id].sort().join('-')}`;
 
@@ -204,6 +204,7 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-center">
                                             <p className="text-sm font-medium truncate">{room.name}</p>
+                                            {/* Only render timestamp on client */}
                                             {room.lastMessageTime && isClient && (
                                                 <span className="text-[11px] text-muted-foreground flex-shrink-0 ml-2">
                                                     {formatDistanceToNow(new Date(room.lastMessageTime), { addSuffix: true, includeSeconds: false })}
@@ -293,6 +294,7 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
                     {recentActivities.map((activity) => (
                     <li key={activity.id} className="flex justify-between items-center hover:bg-muted/50 px-1 -mx-1 rounded transition-colors duration-150">
                         <span className="truncate pr-2">{activity.name} <span className="text-xs opacity-60">({activity.type})</span></span>
+                        {/* Only render timestamp on client */}
                         {isClient && (
                             <span className="text-[11px] flex-shrink-0">
                                 {formatDistanceToNow(new Date(activity.time), { addSuffix: true })}
@@ -362,7 +364,7 @@ export function MySpaceContent({ chatRooms, onSwitchChat }: MySpaceContentProps)
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="relative flex-shrink-0">
                                     <Avatar className="h-9 w-9 border border-border/50">
-                                        <AvatarImage src={friend.avatar} alt={friend.name} />
+                                        <AvatarImage src={friend.avatar || ''} alt={friend.name} />
                                         <AvatarFallback className="text-xs">{friend.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <span className={cn(
