@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,16 +7,28 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Bell, Palette, Shield, LogOut, HelpCircle } from "lucide-react";
+import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy } from "lucide-react"; // Added Copy icon
 import { Separator } from "@/components/ui/separator";
 import Image from 'next/image';
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 export function SettingsContent() {
+  const { toast } = useToast(); // Initialize toast
+
   // Placeholder state - replace with actual state management
   const user = {
       name: "Bob The Builder",
       email: "bob@example.com",
-      avatar: "https://picsum.photos/seed/bob/100/100"
+      avatar: "https://picsum.photos/seed/bob/100/100",
+      kinectId: `KINECT#${Math.floor(1000 + Math.random() * 9000)}` // Generate random Kinect ID
+  }
+
+  const copyKinectId = () => {
+    navigator.clipboard.writeText(user.kinectId);
+    toast({
+      title: "Kinect ID Copied!",
+      description: `${user.kinectId} has been copied to your clipboard.`,
+    });
   }
 
   return (
@@ -32,6 +45,14 @@ export function SettingsContent() {
              <div>
                  <p className="font-semibold">{user.name}</p>
                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                 {/* Display Kinect ID */}
+                 <div className="flex items-center gap-1 mt-1">
+                    <p className="text-xs font-mono text-secondary">{user.kinectId}</p>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-secondary" onClick={copyKinectId}>
+                        <Copy className="h-3 w-3" />
+                        <span className="sr-only">Copy Kinect ID</span>
+                    </Button>
+                 </div>
              </div>
              <Button variant="outline" size="sm" className="ml-auto">Edit Profile</Button>
            </div>

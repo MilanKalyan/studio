@@ -3,11 +3,17 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Folder, Star, Users, Clock } from "lucide-react";
-import Image from 'next/image'; // Import next/image
-import { cn } from "@/lib/utils"; // Import cn utility function
+import { Input } from "@/components/ui/input"; // Import Input
+import { Folder, Star, Users, Clock, UserPlus } from "lucide-react"; // Import UserPlus
+import Image from 'next/image';
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast"; // Import useToast
+import { useState } from "react"; // Import useState
 
 export function MySpaceContent() {
+  const { toast } = useToast(); // Initialize toast
+  const [friendIdInput, setFriendIdInput] = useState('');
+
   // Placeholder data - replace with actual user data fetching
   const recentActivities = [
     { id: 1, type: "game", name: "Tic Tac Toe", time: "5 minutes ago" },
@@ -25,6 +31,24 @@ export function MySpaceContent() {
      { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline'},
      { id: 'dave', name: 'Dave', avatar: 'https://picsum.photos/seed/dave/40/40', status: 'ingame'},
   ];
+
+   const handleAddFriend = () => {
+     if (friendIdInput.trim()) {
+         console.log(`Attempting to add friend with ID: ${friendIdInput}`);
+         // Add actual friend adding logic here (e.g., API call)
+         toast({
+             title: "Friend Request Sent",
+             description: `Friend request sent to ${friendIdInput}.`,
+         });
+         setFriendIdInput(''); // Clear input after sending
+     } else {
+         toast({
+             variant: "destructive",
+             title: "Invalid ID",
+             description: "Please enter a valid Kinect ID.",
+         });
+     }
+   };
 
   return (
     <div className="space-y-6 p-4">
@@ -92,9 +116,26 @@ export function MySpaceContent() {
             <CardTitle className="text-md font-medium flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-500" /> Friends
             </CardTitle>
-             <Button variant="ghost" size="sm">Manage</Button>
+             {/* Replace Manage button with Add Friend input/button */}
+             {/* <Button variant="ghost" size="sm">Manage</Button> */}
         </CardHeader>
         <CardContent>
+           {/* Add Friend Input */}
+           <div className="flex items-center gap-2 mb-4">
+                <Input
+                    type="text"
+                    placeholder="Enter Kinect ID..."
+                    className="flex-1 bg-muted/50 text-sm h-9"
+                    value={friendIdInput}
+                    onChange={(e) => setFriendIdInput(e.target.value)}
+                    aria-label="Enter Kinect ID to add friend"
+                />
+                <Button size="sm" onClick={handleAddFriend} aria-label="Add Friend">
+                    <UserPlus className="h-4 w-4" />
+                </Button>
+           </div>
+
+           {/* Existing Friends List */}
            <div className="space-y-3">
              {friends.map(friend => (
                 <div key={friend.id} className="flex items-center justify-between">
@@ -116,6 +157,9 @@ export function MySpaceContent() {
                     )}>{friend.status}</span>
                 </div>
              ))}
+              {friends.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Add friends using their Kinect ID!</p>
+              )}
            </div>
         </CardContent>
       </Card>
