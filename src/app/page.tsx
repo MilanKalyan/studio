@@ -7,12 +7,14 @@ import LoginPage from './auth/login/page'; // Import the Login page
 import Loading from './loading'; // Import the Loading component
 import { BottomNavigation } from '@/components/bottom-navigation'; // Import BottomNavigation
 import { AppLayout } from '@/components/app-layout'; // Import the main App Layout
+import SetupProfilePage from './auth/setup-profile/page'; // Import Setup Profile page
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null initially, then boolean
+  const [needsProfileSetup, setNeedsProfileSetup] = useState<boolean>(false); // Check if profile setup is needed
   const router = useRouter();
 
-  // Simulate checking authentication status
+  // Simulate checking authentication status and profile status
   useEffect(() => {
     let isMounted = true;
     const checkAuth = async () => {
@@ -20,12 +22,15 @@ export default function Home() {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // --- Placeholder Authentication Logic ---
-      // Replace this with your actual authentication check (e.g., using Firebase Auth)
-      const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true'; // Example using sessionStorage
+      const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
+      // --- Placeholder Profile Check ---
+      const profileComplete = sessionStorage.getItem('isProfileComplete') === 'true'; // Example check
 
       if (isMounted) {
         console.log("Simulated Authentication Status:", loggedIn);
+        console.log("Simulated Profile Status:", profileComplete);
         setIsAuthenticated(loggedIn);
+        setNeedsProfileSetup(loggedIn && !profileComplete); // Needs setup if logged in but profile incomplete
       }
     };
 
@@ -39,14 +44,28 @@ export default function Home() {
    // Simulate login success (can be called from LoginPage)
    const handleLoginSuccess = () => {
        sessionStorage.setItem('isAuthenticated', 'true');
+       // Assume profile is not complete immediately after login, trigger setup
+       sessionStorage.removeItem('isProfileComplete');
        setIsAuthenticated(true);
-       router.replace('/'); // Use replace to avoid back button going to login
+       setNeedsProfileSetup(true);
+       // No immediate redirect, component will render SetupProfilePage
+       // Optionally: router.replace('/'); // Refresh state if needed, but component state change should suffice
    };
+
+   // Simulate profile setup completion (called from SetupProfilePage)
+    const handleProfileSetupComplete = () => {
+        sessionStorage.setItem('isProfileComplete', 'true');
+        setNeedsProfileSetup(false);
+        router.replace('/'); // Navigate to the main app view after setup
+    };
+
 
    // Simulate logout (can be called from Settings)
    const handleLogout = () => {
        sessionStorage.removeItem('isAuthenticated');
+       sessionStorage.removeItem('isProfileComplete');
        setIsAuthenticated(false);
+       setNeedsProfileSetup(false); // Reset profile state on logout
        // No need to push, the component will re-render the LoginPage
    };
 
@@ -62,13 +81,25 @@ export default function Home() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Render main app layout if authenticated
+  // Render Profile Setup page if authenticated but profile needs setup
+    if (needsProfileSetup) {
+        // Center the profile setup card
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50 p-4">
+                <SetupProfilePage onSetupComplete={handleProfileSetupComplete} />
+            </div>
+        );
+    }
+
+
+  // Render main app layout if authenticated and profile is complete
   return (
-    // Use h-screen and flex-col for full height layout that includes the bottom nav
-    <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/10">
-       {/* Main Content Area - flex-1 allows it to grow. REMOVED pb-16 */}
+    // Use min-h-screen and flex-col for full height layout
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-muted/10">
+       {/* Main Content Area - flex-1 allows it to grow. */}
        {/* overflow-hidden ensures content doesn't spill out */}
-       <main className="flex-1 p-2 md:p-4 overflow-hidden">
+       {/* Added relative positioning context for the FAB */}
+       <main className="flex-1 p-2 md:p-4 overflow-hidden relative">
          {/* AppLayout handles the main structure */}
          <AppLayout />
        </main>

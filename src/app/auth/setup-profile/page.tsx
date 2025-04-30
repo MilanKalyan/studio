@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation'; // Use next/navigation
+// Removed useRouter import as we use onSetupComplete callback
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,12 +28,16 @@ const placeholderAvatars = [
   'https://picsum.photos/seed/avatar5/100/100',
 ];
 
-export default function SetupProfilePage() {
+interface SetupProfilePageProps {
+    onSetupComplete: () => void; // Callback on successful setup
+}
+
+export default function SetupProfilePage({ onSetupComplete }: SetupProfilePageProps) {
   const [username, setUsername] = useState(''); // Assume username might be pre-filled or editable
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [customAvatarPreview, setCustomAvatarPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  // Removed router instance
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,7 +70,7 @@ export default function SetupProfilePage() {
   };
 
 
-  const handleSetupComplete = async (e: React.FormEvent) => {
+  const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
       toast({
@@ -98,17 +102,18 @@ export default function SetupProfilePage() {
       description: 'Welcome to Kinect!',
     });
 
-    // Redirect to the main application page
-    router.push('/');
+    // Call the completion callback instead of router.push
+    onSetupComplete();
 
-    // setIsLoading(false); // Keep loading state until redirect
+    // setIsLoading(false); // Keep loading state until transition
   };
 
   const finalAvatarSrc = customAvatarPreview || selectedAvatar || '';
   const avatarFallback = username ? username.charAt(0).toUpperCase() : <UserCircle />;
 
   return (
-    <Card className="w-full max-w-lg mx-auto animate-fade-in opacity-0 shadow-2xl border-primary/20 bg-card/90 backdrop-blur-sm">
+    // Removed centering wrapper div, parent layout handles it
+    <Card className="w-full max-w-lg mx-auto animate-fade-in opacity-0 shadow-2xl border-primary/20 bg-card/90 backdrop-blur-sm transition-shadow hover:shadow-primary/10">
       <CardHeader className="text-center space-y-1">
         <CardTitle className="text-3xl font-bold tracking-tight text-primary retro-glow">
           Set Up Your Profile
@@ -118,7 +123,7 @@ export default function SetupProfilePage() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <form onSubmit={handleSetupComplete} className="space-y-6">
+        <form onSubmit={handleSetupSubmit} className="space-y-6">
           {/* Avatar Selection */}
            <div className="flex flex-col items-center space-y-4">
              <Label>Choose Your Avatar</Label>
@@ -132,7 +137,7 @@ export default function SetupProfilePage() {
                  <Button
                     variant="outline"
                     size="icon"
-                    className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border-border shadow-md group-hover:opacity-100 opacity-70 transition-opacity"
+                    className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border-border shadow-md group-hover:opacity-100 opacity-70 transition-opacity hover:scale-110 active:scale-95"
                     onClick={triggerFileInput}
                     type="button"
                     aria-label="Upload Custom Avatar"
@@ -180,12 +185,12 @@ export default function SetupProfilePage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="bg-muted/30 focus:bg-background text-center text-lg"
+              className="bg-muted/30 focus:bg-background text-center text-lg transition-all duration-200 focus:ring-2 focus:ring-ring"
               disabled={isLoading}
             />
           </div>
 
-          <Button type="submit" className="w-full retro-glow" disabled={isLoading || !username.trim() || (!selectedAvatar && !customAvatarPreview)}>
+          <Button type="submit" className="w-full retro-glow transition-all duration-300 transform hover:scale-105 active:scale-100" disabled={isLoading || !username.trim() || (!selectedAvatar && !customAvatarPreview)}>
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (

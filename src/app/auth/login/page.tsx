@@ -94,10 +94,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50 p-4">
-        <Card className="w-full max-w-md mx-auto animate-fade-in opacity-0 shadow-2xl border-primary/20 bg-card/90 backdrop-blur-sm [--fade-in-delay:100ms]">
+        <Card className="w-full max-w-md mx-auto animate-fade-in opacity-0 shadow-2xl border-primary/20 bg-card/90 backdrop-blur-sm [--fade-in-delay:100ms] transition-shadow hover:shadow-primary/10">
             <CardHeader className="text-center space-y-1">
                 <CardTitle className="text-3xl font-bold tracking-tight text-primary retro-glow">
-                Kinect
+                  Kinect
                 </CardTitle>
                 <CardDescription className="text-muted-foreground">
                 Stay Kinected. Log in to continue.
@@ -114,7 +114,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
-                    className="bg-muted/30 focus:bg-background transition-colors duration-200"
+                    className="bg-muted/30 focus:bg-background transition-all duration-200 focus:ring-2 focus:ring-ring"
                     disabled={isLoading}
                     />
                 </div>
@@ -123,7 +123,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     <Label htmlFor="password">Password</Label>
                     <Link
                         href="#"
-                        className="text-sm text-primary hover:underline transition-colors duration-200"
+                        className="text-sm text-primary hover:underline transition-colors duration-200 focus:outline-none focus:ring-1 focus:ring-ring rounded"
                         tabIndex={isLoading ? -1 : 0}
                     >
                         Forgot password?
@@ -136,11 +136,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="bg-muted/30 focus:bg-background transition-colors duration-200"
+                    className="bg-muted/30 focus:bg-background transition-all duration-200 focus:ring-2 focus:ring-ring"
                     disabled={isLoading}
                     />
                 </div>
-                <Button type="submit" className="w-full retro-glow transition-all duration-300 transform hover:scale-105" disabled={isLoading}>
+                <Button type="submit" className="w-full retro-glow transition-all duration-300 transform hover:scale-105 active:scale-100" disabled={isLoading}>
                     {isLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -160,10 +160,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" className="w-full transition-colors duration-200 flex items-center justify-center gap-2" onClick={() => handleSocialLogin('Google')} disabled={isLoading}>
+                <Button variant="outline" className="w-full transition-all duration-200 flex items-center justify-center gap-2 hover:bg-accent hover:shadow-sm active:scale-95" onClick={() => handleSocialLogin('Google')} disabled={isLoading}>
                     <GoogleIcon /> Google
                     </Button>
-                    <Button variant="outline" className="w-full transition-colors duration-200 flex items-center justify-center gap-2" onClick={() => handleSocialLogin('Apple')} disabled={isLoading}>
+                    <Button variant="outline" className="w-full transition-all duration-200 flex items-center justify-center gap-2 hover:bg-accent hover:shadow-sm active:scale-95" onClick={() => handleSocialLogin('Apple')} disabled={isLoading}>
                     <AppleIcon /> Apple
                     </Button>
                 </div>
@@ -171,7 +171,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <CardFooter className="text-center text-sm">
                 <p className="text-muted-foreground w-full">
                 Don&apos;t have an account?{' '}
-                <Link href="/auth/signup" className="text-primary hover:underline transition-colors duration-200" tabIndex={isLoading ? -1 : 0}>
+                <Link href="/auth/signup" className="text-primary hover:underline transition-colors duration-200 focus:outline-none focus:ring-1 focus:ring-ring rounded" tabIndex={isLoading ? -1 : 0}>
                     Sign Up
                 </Link>
                 </p>

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Kinect - Authentication',
-  description: 'Login or Sign up to Kinect',
+  title: 'NexusPlay - Authentication', // Updated App Name
+  description: 'Login, Sign up, or set up your profile on NexusPlay', // Updated App Name
 };
 
 export default function AuthLayout({
@@ -10,9 +10,11 @@ export default function AuthLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The div wrapper here isn't strictly necessary as LoginPage now includes a full-screen flex container.
-  // Returning children directly might be slightly cleaner, assuming child pages handle their own layout.
-  // However, keeping it allows adding shared elements later if needed.
-  // For now, let's keep it simple and remove it.
-  return <>{children}</>;
+  // Add a wrapper div to center the content (like LoginPage)
+  // and apply the consistent background gradient.
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50 p-4">
+      {children}
+    </div>
+  );
 }

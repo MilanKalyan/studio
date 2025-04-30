@@ -1,16 +1,15 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react'; // Import Suspense
-import { GeistSans } from 'geist/font/sans'; // Correct import for Geist Sans
+// Removed Geist font imports
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
 import Loading from './loading'; // Import the loading component
 
-// Define font variables
-const fontSansVariable = GeistSans.variable;
+// Removed font variables
 
 export const metadata: Metadata = {
-  title: 'Kinect',
+  title: 'Kinect', // Kept App Name
   description: 'Chat, play games, and connect.',
 };
 
@@ -20,19 +19,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // Apply dark theme and font variables directly to html tag
-    <html lang="en" className={cn("dark", fontSansVariable)}>
+    // Apply dark theme directly to html tag
+    // Removed font variable class
+    <html lang="en" className="dark">
       <body
         className={cn(
-          'antialiased font-sans transition-colors duration-300 flex flex-col min-h-screen bg-background text-foreground' // Ensure body has background/text colors
+          // Use default sans-serif font stack
+          'antialiased font-sans',
+          'transition-colors duration-300 flex flex-col min-h-screen bg-background text-foreground' // Ensure body has background/text colors
         )}
       >
          {/* Wrap children with Suspense for route loading states */}
          <Suspense fallback={<Loading />}>
-            {/* Main content area takes remaining space - removed overflow-y-auto */}
+            {/* Main content area takes remaining space */}
             <main className="flex-1">{children}</main>
          </Suspense>
-         {/* BottomNavigation is now rendered conditionally within page.tsx when authenticated */}
+         {/* BottomNavigation is rendered conditionally within page.tsx */}
         <Toaster />
       </body>
     </html>
