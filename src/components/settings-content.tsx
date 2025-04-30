@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,101 +6,221 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy } from "lucide-react"; // Added Copy icon
+import { User, Bell, Palette, Shield, LogOut, HelpCircle, Copy, Loader2 } from "lucide-react"; // Added Loader2
 import { Separator } from "@/components/ui/separator";
 import Image from 'next/image';
-import { useToast } from "@/hooks/use-toast"; // Import useToast
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react"; // Import useState and useEffect
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
-export function SettingsContent() {
-  const { toast } = useToast(); // Initialize toast
+interface SettingsContentProps {
+    onLogout: () => void; // Define the prop type
+}
 
-  // Placeholder state - replace with actual state management
-  const user = {
-      name: "Bob The Builder",
-      email: "bob@example.com",
-      avatar: "https://picsum.photos/seed/bob/100/100",
-      kinectId: `KINECT#${Math.floor(1000 + Math.random() * 9000)}` // Generate random Kinect ID
-  }
+export function SettingsContent({ onLogout }: SettingsContentProps) { // Accept the prop
+  const { toast } = useToast();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isClient, setIsClient] = useState(false); // State for client-side rendering check
+
+  useEffect(() => {
+    setIsClient(true); // Component has mounted on the client
+  }, []);
+
+
+  // Placeholder state - replace with actual state management/data fetching
+  const [user, setUser] = useState({
+      name: "Loading...",
+      email: "loading@example.com",
+      avatar: "https://picsum.photos/seed/placeholder/100/100", // Placeholder image initially
+      kinectId: "KINECT#..."
+  });
+   const [settings, setSettings] = useState({
+        pushNotifications: true,
+        emailNotifications: false,
+        soundNotifications: true,
+        theme: "dark", // Default theme
+   });
+
+
+   // Simulate fetching user data
+   useEffect(() => {
+       if (isClient) { // Only run fetch simulation on client
+            const timer = setTimeout(() => {
+                 setUser({
+                     name: "Bob The Builder",
+                     email: "bob@example.com",
+                     avatar: "https://picsum.photos/seed/bob/100/100",
+                     kinectId: `KINECT#${Math.floor(1000 + Math.random() * 9000)}`
+                 });
+            }, 1000); // Simulate 1 second delay
+            return () => clearTimeout(timer);
+       }
+   }, [isClient]);
+
 
   const copyKinectId = () => {
-    navigator.clipboard.writeText(user.kinectId);
-    toast({
-      title: "Kinect ID Copied!",
-      description: `${user.kinectId} has been copied to your clipboard.`,
+    if (!navigator.clipboard) {
+        toast({ variant: "destructive", title: "Clipboard Error", description: "Clipboard API not available." });
+        return;
+    }
+    navigator.clipboard.writeText(user.kinectId).then(() => {
+        toast({
+            title: "Kinect ID Copied!",
+            description: `${user.kinectId} has been copied to your clipboard.`,
+            duration: 3000,
+        });
+    }).catch(err => {
+        console.error('Failed to copy Kinect ID: ', err);
+        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy ID." });
     });
   }
 
+   const handleLogoutClick = async () => {
+        setIsLoggingOut(true);
+        // Simulate logout delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Call the passed-in onLogout function
+        onLogout();
+        toast({ title: "Logged Out", description: "You have been logged out successfully.", duration: 3000 });
+        // No need to set isLoggingOut back to false as the component might unmount
+    };
+
+    // Handle settings changes
+    const handleSwitchChange = (id: keyof typeof settings, checked: boolean) => {
+        setSettings(prev => ({ ...prev, [id]: checked }));
+        // Here you would typically save the setting to your backend/localStorage
+        toast({ title: "Settings Updated", description: `Setting ${id} updated.`, duration: 2000 });
+    };
+
+    const handleThemeChange = (value: string) => {
+        setSettings(prev => ({ ...prev, theme: value }));
+        // Apply theme change logic (e.g., update class on body/html)
+         if (typeof window !== 'undefined') {
+             document.documentElement.classList.remove('light', 'dark');
+             if (value === 'system') {
+                 const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                 document.documentElement.classList.add(systemPrefersDark ? 'dark' : 'light');
+             } else {
+                 document.documentElement.classList.add(value);
+             }
+         }
+        toast({ title: "Theme Updated", description: `Theme set to ${value}.`, duration: 2000 });
+    };
+
+
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6 p-4 pb-10"> {/* Add padding bottom */}
       {/* Account Section */}
-      <Card>
+      <Card className="animate-fade-in opacity-0 [--fade-in-delay:50ms]">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5" /> Account</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-primary" /> Account</CardTitle>
           <CardDescription>Manage your profile and account settings.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
            <div className="flex items-center gap-4">
-             <Image src={user.avatar} alt={user.name} width={60} height={60} className="rounded-full" />
-             <div>
-                 <p className="font-semibold">{user.name}</p>
-                 <p className="text-sm text-muted-foreground">{user.email}</p>
-                 {/* Display Kinect ID */}
-                 <div className="flex items-center gap-1 mt-1">
-                    <p className="text-xs font-mono text-secondary">{user.kinectId}</p>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-secondary" onClick={copyKinectId}>
-                        <Copy className="h-3 w-3" />
-                        <span className="sr-only">Copy Kinect ID</span>
-                    </Button>
-                 </div>
+             {isClient && user.name !== "Loading..." ? (
+                 <Image src={user.avatar} alt={user.name} width={60} height={60} className="rounded-full border-2 border-primary/50" />
+             ) : (
+                 <Skeleton className="h-[60px] w-[60px] rounded-full" />
+             )}
+             <div className="flex-1 min-w-0"> {/* Ensure div takes space and allows wrap */}
+                 {isClient && user.name !== "Loading..." ? (
+                     <>
+                        <p className="font-semibold truncate">{user.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                            <p className="text-xs font-mono text-secondary truncate">{user.kinectId}</p>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-secondary flex-shrink-0" onClick={copyKinectId} aria-label="Copy Kinect ID">
+                                <Copy className="h-3 w-3" />
+                            </Button>
+                        </div>
+                     </>
+                 ) : (
+                    <div className="space-y-1.5">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-3 w-1/2" />
+                    </div>
+                 )}
              </div>
-             <Button variant="outline" size="sm" className="ml-auto">Edit Profile</Button>
+             <Button variant="outline" size="sm" className="ml-auto flex-shrink-0" disabled={!isClient || user.name === "Loading..."}>Edit Profile</Button>
            </div>
            <Separator />
            <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input id="username" defaultValue={user.name} />
+            <Label htmlFor="username-settings">Username</Label>
+            {isClient && user.name !== "Loading..." ? (
+                 <Input id="username-settings" defaultValue={user.name} />
+            ): (
+                <Skeleton className="h-10 w-full" />
+            )}
           </div>
            <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" defaultValue={user.email} disabled />
+            <Label htmlFor="email-settings">Email</Label>
+            {isClient && user.email !== "loading@example.com" ? (
+                <Input id="email-settings" type="email" defaultValue={user.email} disabled />
+            ) : (
+                <Skeleton className="h-10 w-full" />
+            )}
           </div>
-          <Button variant="outline" className="w-full">Change Password</Button>
+          <Button variant="outline" className="w-full" disabled={!isClient}>Change Password</Button>
         </CardContent>
       </Card>
 
       {/* Notifications Section */}
-      <Card>
+      <Card className="animate-fade-in opacity-0 [--fade-in-delay:150ms]">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><Bell className="h-5 w-5" /> Notifications</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><Bell className="h-5 w-5 text-primary" /> Notifications</CardTitle>
           <CardDescription>Configure how you receive notifications.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="push-notifications">Push Notifications</Label>
-            <Switch id="push-notifications" defaultChecked />
+            <Label htmlFor="push-notifications" className="flex-1 pr-4">Push Notifications</Label>
+            <Switch
+                id="push-notifications"
+                checked={settings.pushNotifications}
+                onCheckedChange={(checked) => handleSwitchChange('pushNotifications', checked)}
+                disabled={!isClient}
+                aria-label="Toggle Push Notifications"
+            />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="email-notifications">Email Notifications</Label>
-            <Switch id="email-notifications" />
+            <Label htmlFor="email-notifications" className="flex-1 pr-4">Email Notifications</Label>
+            <Switch
+                id="email-notifications"
+                checked={settings.emailNotifications}
+                onCheckedChange={(checked) => handleSwitchChange('emailNotifications', checked)}
+                disabled={!isClient}
+                aria-label="Toggle Email Notifications"
+            />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="sound-notifications">Notification Sounds</Label>
-            <Switch id="sound-notifications" defaultChecked />
+            <Label htmlFor="sound-notifications" className="flex-1 pr-4">Notification Sounds</Label>
+            <Switch
+                id="sound-notifications"
+                checked={settings.soundNotifications}
+                onCheckedChange={(checked) => handleSwitchChange('soundNotifications', checked)}
+                disabled={!isClient}
+                aria-label="Toggle Notification Sounds"
+            />
           </div>
         </CardContent>
       </Card>
 
        {/* Appearance Section */}
-      <Card>
+      <Card className="animate-fade-in opacity-0 [--fade-in-delay:250ms]">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><Palette className="h-5 w-5" /> Appearance</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><Palette className="h-5 w-5 text-primary" /> Appearance</CardTitle>
            <CardDescription>Customize the look and feel of the app.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="theme">Theme</Label>
-            <Select defaultValue="dark">
-                 <SelectTrigger id="theme" className="w-[180px]">
+            <Label htmlFor="theme-select">Theme</Label>
+            <Select
+                value={settings.theme}
+                onValueChange={handleThemeChange}
+                disabled={!isClient}
+            >
+                 <SelectTrigger id="theme-select" className="w-[180px]">
                     <SelectValue placeholder="Select theme" />
                  </SelectTrigger>
                  <SelectContent>
@@ -117,35 +236,45 @@ export function SettingsContent() {
 
 
       {/* Privacy & Security Section */}
-      <Card>
+      <Card className="animate-fade-in opacity-0 [--fade-in-delay:350ms]">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><Shield className="h-5 w-5" /> Privacy & Security</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><Shield className="h-5 w-5 text-primary" /> Privacy & Security</CardTitle>
           <CardDescription>Manage who can see your activity and secure your account.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button variant="outline" className="w-full">Manage Blocked Users</Button>
-          <Button variant="outline" className="w-full">Activity Status Settings</Button>
-          <Button variant="outline" className="w-full">Two-Factor Authentication</Button>
+        <CardContent className="space-y-3">
+          <Button variant="outline" className="w-full justify-start text-left" disabled={!isClient}>Manage Blocked Users</Button>
+          <Button variant="outline" className="w-full justify-start text-left" disabled={!isClient}>Activity Status Settings</Button>
+          <Button variant="outline" className="w-full justify-start text-left" disabled={!isClient}>Two-Factor Authentication</Button>
         </CardContent>
       </Card>
 
       {/* Help & Support Section */}
-       <Card>
+       <Card className="animate-fade-in opacity-0 [--fade-in-delay:450ms]">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><HelpCircle className="h-5 w-5" /> Help & Support</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><HelpCircle className="h-5 w-5 text-primary" /> Help & Support</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-           <Button variant="ghost" className="w-full justify-start">FAQ</Button>
-           <Button variant="ghost" className="w-full justify-start">Contact Support</Button>
-           <Button variant="ghost" className="w-full justify-start">Terms of Service</Button>
-           <Button variant="ghost" className="w-full justify-start">Privacy Policy</Button>
+           <Button variant="ghost" className="w-full justify-start text-left" disabled={!isClient}>FAQ</Button>
+           <Button variant="ghost" className="w-full justify-start text-left" disabled={!isClient}>Contact Support</Button>
+           <Button variant="ghost" className="w-full justify-start text-left" disabled={!isClient}>Terms of Service</Button>
+           <Button variant="ghost" className="w-full justify-start text-left" disabled={!isClient}>Privacy Policy</Button>
         </CardContent>
       </Card>
 
 
       {/* Logout Button */}
-       <Button variant="destructive" className="w-full flex items-center gap-2">
-           <LogOut className="h-4 w-4" /> Logout
+       <Button
+           variant="destructive"
+           className="w-full flex items-center gap-2 animate-fade-in opacity-0 [--fade-in-delay:550ms]"
+           onClick={handleLogoutClick} // Use the handler
+           disabled={isLoggingOut || !isClient} // Disable while logging out or if not client
+        >
+           {isLoggingOut ? (
+               <Loader2 className="h-4 w-4 animate-spin" />
+           ) : (
+               <LogOut className="h-4 w-4" />
+           )}
+           {isLoggingOut ? 'Logging Out...' : 'Logout'}
         </Button>
     </div>
   );

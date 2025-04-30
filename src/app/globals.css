@@ -73,16 +73,18 @@ body {
     @apply bg-background text-foreground;
     /* Apply dark theme by default */
     @apply dark;
+    /* Improve scrollbar behavior */
+    scrollbar-gutter: stable;
   }
 }
 
 /* Add simple retro animation */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 5px hsl(var(--secondary)), 0 0 10px hsl(var(--secondary));
+    box-shadow: 0 0 3px hsl(var(--secondary)), 0 0 6px hsl(var(--secondary) / 0.7);
   }
   50% {
-    box-shadow: 0 0 10px hsl(var(--secondary)), 0 0 20px hsl(var(--secondary));
+    box-shadow: 0 0 6px hsl(var(--secondary)), 0 0 12px hsl(var(--secondary) / 0.7);
   }
 }
 
@@ -92,30 +94,33 @@ body {
 
 /* Style scrollbars for a more integrated look */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px; /* Slightly thinner */
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background) / 0.5);
+  background: hsl(var(--muted) / 0.2); /* More subtle track */
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.7);
+  background: hsl(var(--primary) / 0.5); /* More subtle thumb */
   border-radius: 10px;
+  border: 1px solid hsl(var(--background) / 0.5); /* Add slight border */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.8);
 }
 
-/* Add fade-in animation */
+/* Add fade-in animation with customizable delay */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
+  animation: fade-in 0.4s ease-out forwards;
+  /* Default delay if not overridden */
+  animation-delay: var(--fade-in-delay, 0ms);
 }
