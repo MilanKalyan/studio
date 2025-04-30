@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Import Avatar components
+
 
 // Define snap position type, must match the one in bottom-navigation.tsx
 type NavSnapPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
@@ -40,7 +42,7 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
   const [user, setUser] = useState({
       name: "Loading...",
       email: "loading@example.com",
-      avatar: "https://picsum.photos/seed/placeholder/100/100", // Placeholder image initially
+      avatar: undefined as string | undefined, // Use undefined initially
       kinectId: "KINECT#..."
   });
    const [settings, setSettings] = useState({
@@ -60,7 +62,7 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
                  setUser({
                      name: "Bob The Builder",
                      email: "bob@example.com",
-                     avatar: "https://picsum.photos/seed/bob/100/100",
+                     avatar: "https://picsum.photos/seed/bob/100/100", // Set avatar URL after delay
                      kinectId: `KINECT#${randomIdPart}` // Assign generated ID
                  });
                  // Load saved theme preference
@@ -152,7 +154,10 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
         <CardContent className="space-y-4">
            <div className="flex items-center gap-4">
              {isClient && user.name !== "Loading..." ? (
-                 <Image src={user.avatar} alt={user.name} width={60} height={60} className="rounded-full border-2 border-primary/50" />
+                 <Avatar className="h-[60px] w-[60px] border-2 border-primary/50">
+                    <AvatarImage src={user.avatar} alt={user.name} />
+                    <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                 </Avatar>
              ) : (
                  <Skeleton className="h-[60px] w-[60px] rounded-full" />
              )}
@@ -334,5 +339,3 @@ export function SettingsContent({ onLogout, setNavPosition, currentNavPosition }
     </div>
   );
 }
-
-    

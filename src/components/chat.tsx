@@ -52,7 +52,7 @@ export interface Player { // Exporting for use in MySpaceContent
     kinectId: string; // Added Kinect ID
 }
 
-// Placeholder friends data
+// Placeholder friends data (consistent with MySpaceContent)
 const placeholderFriends: Player[] = [
      { id: 'alice', name: 'Alice', avatar: 'https://picsum.photos/seed/alice/40/40', status: 'online', kinectId: 'KINECT#1234'},
      { id: 'charlie', name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/40/40', status: 'offline', kinectId: 'KINECT#5678'},
@@ -117,8 +117,14 @@ export function Chat({
     setIsClient(true);
     // Simulate fetching initial friends (still needed for the 'Add Room' sheet)
     const timer = setTimeout(() => {
-        setFriends(placeholderFriends);
-        setFilteredFriends(placeholderFriends);
+        // Ensure friends list is consistent
+        const kinectIds = ['1234', '5678', '9012', '3456', '7890'];
+        const updatedFriends = placeholderFriends.map((friend, index) => ({
+            ...friend,
+            kinectId: `KINECT#${kinectIds[index] || Math.floor(1000 + Math.random() * 9000)}` // Add unique ID if missing
+        }));
+        setFriends(updatedFriends);
+        setFilteredFriends(updatedFriends);
     }, 500); // Shorter delay as main data comes from props
 
     return () => clearTimeout(timer); // Cleanup timer on unmount
@@ -134,7 +140,7 @@ export function Chat({
        setFilteredFriends(
            friends.filter(friend =>
                friend.name.toLowerCase().includes(lowerCaseTerm) ||
-               friend.kinectId.toLowerCase().includes(lowerCaseTerm) // Search by Kinect ID too
+               (friend.kinectId && friend.kinectId.toLowerCase().includes(lowerCaseTerm)) // Search by Kinect ID too, check if kinectId exists
            )
        );
    }, [friendSearchTerm, friends]);
@@ -302,12 +308,12 @@ export function Chat({
    // Get display details for the current chat using the currentChat prop
    const currentChatDisplay = !currentChat || currentChat.id === 'loading' ? {
        name: 'Loading...',
-       avatar: '',
+       avatar: undefined, // Pass undefined instead of empty string
        fallback: 'L',
        isOnline: false
    } : {
        name: currentChat.name,
-       avatar: currentChat.avatar || '',
+       avatar: currentChat.avatar || undefined, // Ensure undefined if no avatar
        fallback: currentChat.name.charAt(0).toUpperCase(),
        // Basic online status simulation (only for DMs for now)
        isOnline: currentChat.type === 'dm' && friends.find(f => f.id === currentChat.participants.find(p => p !== currentUserId))?.status === 'online'
@@ -327,6 +333,7 @@ export function Chat({
                 <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto -ml-2 focus-visible:ring-1 focus-visible:ring-ring" disabled={!currentChat}>
                     <div className="relative">
                         <Avatar className={cn("h-8 w-8 border-2", currentChatDisplay.isOnline ? "border-green-500/70" : "border-border/50")}>
+                             {/* Pass undefined or a valid URL to src */}
                             <AvatarImage src={currentChatDisplay.avatar} alt={currentChatDisplay.name} />
                             <AvatarFallback>{currentChatDisplay.fallback}</AvatarFallback>
                         </Avatar>
@@ -358,7 +365,8 @@ export function Chat({
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                             ) : (
                                 <Avatar className="h-5 w-5">
-                                    <AvatarImage src={room.avatar} alt={room.name} />
+                                    {/* Pass undefined or valid URL */}
+                                    <AvatarImage src={room.avatar || undefined} alt={room.name} />
                                     <AvatarFallback>{room.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             )}
